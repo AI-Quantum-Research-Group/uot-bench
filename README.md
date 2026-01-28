@@ -6,6 +6,8 @@ generating problems and measures, and a configurable benchmarking pipeline for
 running experiments at scale.
 
 - Documentation index: [docs/index.md](docs/index.md)
+- Problems module: [docs/problems.md](docs/problems.md)
+- Problem generators: [docs/generators.md](docs/generators.md)
 - SLURM guide: [docs/slurm.md](docs/slurm.md)
 - Color transfer experiment: [docs/color_transfer.md](docs/color_transfer.md)
 - MNIST classification experiment: [docs/mnist.md](docs/mnist.md)

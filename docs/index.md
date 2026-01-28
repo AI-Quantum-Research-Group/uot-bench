@@ -19,6 +19,10 @@ under the `uot/` directory. Important subpackages are:
   the `BaseSolver` API.
 - **`uot.experiments`** – functions and helpers for running benchmarks.
 
+Additional module docs:
+- [Problems module](problems.md)
+- [Problem generators](generators.md)
+
 Configuration files for dataset generation and experiment runs live in the
 `configs/` directory while convenience scripts for SLURM jobs are placed under
 `scripts/`.
