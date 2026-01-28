@@ -1,43 +1,106 @@
-# Utils for OT Methods Benchmark
+# uot-bench
 
-- See [docs/index.md](docs/index.md) for full documentation on main pipeline.
-- See [docs/slurm.md](docs/slurm.md) for examples related to slurm.
-- See [docs/color_transfer.md](docs/color_transfer.md) for detailed explanation of the color transfer experiment.
-- See [docs/mnist.md](docs/mnist.md) for detailed explanation of the MNIST Classification experiment.
+uot-bench is a Python toolkit for optimal transport solvers and benchmarking.
+It provides JAX-first implementations of common OT methods, utilities for
+generating problems and measures, and a configurable benchmarking pipeline for
+running experiments at scale.
 
-## Installing Pixi
+- Documentation index: [docs/index.md](docs/index.md)
+- SLURM guide: [docs/slurm.md](docs/slurm.md)
+- Color transfer experiment: [docs/color_transfer.md](docs/color_transfer.md)
+- MNIST classification experiment: [docs/mnist.md](docs/mnist.md)
 
-This project uses [Pixi](https://prefix.dev/docs/pixi/) to manage dependencies. Follow the official installation instructions for your platform:
+## Install
+
+Core install:
+```
+pip install uot-bench
+```
+
+Extras (optional):
+```
+pip install "uot-bench[viz,image-analysis,color-transfer,gurobi]"
+```
+
+CUDA (optional, JAX):
+```
+pip install "uot-bench[cuda12]"
+```
+
+## Quickstart (Python API)
+
+A minimal two-marginal Sinkhorn example:
+
+```python
+import numpy as np
+
+from uot.data.measure import DiscreteMeasure
+from uot.problems.two_marginal import TwoMarginalProblem
+from uot.solvers.sinkhorn import SinkhornTwoMarginalSolver
+from uot.utils.costs import cost_euclid_squared
+
+# Create two 1D discrete measures
+x = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
+y = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
+
+a = np.exp(-((x - 0.3) ** 2) / 0.01).reshape(-1)
+a = a / a.sum()
+b = np.exp(-((y - 0.7) ** 2) / 0.02).reshape(-1)
+b = b / b.sum()
+
+mu = DiscreteMeasure(x, a, name="mu")
+nu = DiscreteMeasure(y, b, name="nu")
+
+problem = TwoMarginalProblem("toy", mu, nu, cost_euclid_squared)
+solver = SinkhornTwoMarginalSolver()
+
+result = solver.solve(
+    marginals=problem.get_marginals(),
+    costs=problem.get_costs(),
+    reg=1e-2,
+)
+
+print("cost:", float(result["cost"]))
+```
+
+## Benchmarking CLI tools (Pixi)
+
+This project uses [Pixi](https://prefix.dev/docs/pixi/) to manage
+benchmarking dependencies and tasks.
+
+### Installing Pixi
 
 - [Linux](https://prefix.dev/docs/pixi/install#linux)
 - [macOS](https://prefix.dev/docs/pixi/install#macos)
 - [Windows](https://prefix.dev/docs/pixi/install#windows)
 
-After installation run `pixi install` to set up the environment. Available tasks can be invoked with `pixi run <task>`.
+After installation run `pixi install` to set up the environment. Available
+commands can be invoked with `pixi run <task>`.
 
 ### Common commands
 
-- `pixi run serialize --config <config.yaml> --export-dir <directory>` - create problem datasets from `config.yaml` in the target directory.
-- `pixi run benchmark --config <config.yaml> --folds <n> --export <file>` - run experiments using the configuration for `n` folds and write results to `file`.
-- `pixi run lint` or `ruff check .` to lint the code.
-
+- `pixi run serialize --config <config.yaml> --export-dir <directory>`
+- `pixi run benchmark --config <config.yaml> --folds <n> --export <file>`
+- `pixi run lint` or `ruff check .`
 
 ## Slurm
 
-### On *Compute Canada* clusters
+### On Compute Canada clusters
 
 The generic script for both SLURM and local runs is `scripts/run_benchmark.sh`.
-For example:
-`sbatch scripts/run_benchmark.sh configs/generators/gaussians.yaml configs/runners/gaussians.yaml`
-
-One can monitor the GPU usage on the node with the following command, which runs `nvidia-smi` every 30 seconds
+Example:
 ```
-$ srun --jobid 123456 --pty watch -n 30 nvidia-smi
+sbatch scripts/run_benchmark.sh configs/generators/gaussians.yaml configs/runners/gaussians.yaml
+```
+
+Monitor GPU usage with:
+```
+srun --jobid 123456 --pty watch -n 30 nvidia-smi
 ```
 
 ## Synthetic datasets
 
-To create synthetic dataset first need to create config file for generation:
+Create a generator config like:
 
 ```yaml
 generators:
@@ -53,17 +116,14 @@ generators:
     seed: 42
 ```
 
-Class specified in `generator` field will be used and all other fields will be passed as init arguments to it. Section name (in this case `1D-gaussians-64`) will be used as generator name. Multiple generators in one config are allowed.
-
+Then serialize:
 ```
-$ pixi run serialize --config configs/generators/gaussians.yaml --export-dir datasets/synthetic
+pixi run serialize --config configs/generators/gaussians.yaml --export-dir datasets/synthetic
 ```
-
-In `export-dir` folders with serialized problems for each generators will be created. In the same folder `meta.yaml` will be created with copy of generator config. 
 
 ## Running experiments
 
-To run experiments, first create config file like:
+Example config:
 
 ```yaml
 param-grids:
@@ -87,17 +147,14 @@ experiment:
   function: uot.experiments.measurement.measure_time
 ```
 
-Here you can define solvers and their param-grids (solver will be run for each set of params). Also in `problems` section with `dir` the `export-dir` of serialization is specified (see previous section) and with names specific folders with problems in that directory
-
+Run the benchmark:
 ```
-$ pixi run benchmark --config configs/runners/gaussians.yaml --folds 1 --export results/raw/gaussians.csv
+pixi run benchmark --config configs/runners/gaussians.yaml --folds 1 --export results/raw/gaussians.csv
 ```
-
-With `export` one can secify where to put csv-report of experiment
 
 ## Color Transfer
 
-To run a Color Transfer experiment, first create config file like:
+Example config:
 
 ```yaml
 param-grids:
@@ -137,7 +194,10 @@ experiment:
   name: Time and test
   output-dir: ./outputs/color_transfer
 ```
-For detailed explanation of the parameters, please refer to [docs/color_transfer.md](docs/color_transfer.md). Notably, `soft-extension` and `displacement-interpolation` can be single values or lists (e.g. both `no` and `yes`) and the pipeline will run once per option, tagging each row with the applied setting.
+
+For detailed explanation of parameters, see [docs/color_transfer.md](docs/color_transfer.md).
+Notably, `soft-extension` and `displacement-interpolation` can be single values
+or lists, and the pipeline will run once per option.
 
 Example: Lab space with selected channels.
 ```yaml
@@ -145,37 +205,35 @@ color-space: lab
 active-channels: [l, a]
 ```
 
-The corresponding pixi command example:
+Run the experiment:
 ```
 pixi run color-transfer --config ./configs/color_transfer/example.yaml
 ```
 
-There is also a feature to create a dashboard for visual comparison of the input images and results - the corresponding command is:
+Dashboard visualization:
 ```
 pixi run color-transfer-visualization --origin_folder <path_to_input_images> --results_folder <path_to_resulting_images>
 ```
 
 ## MNIST Classification
 
-The MNIST classification experiment is performed in two steps.
+The MNIST experiment is performed in two steps:
 
-- Distance matrix calculation.
-- Classification itself.
+- Distance matrix calculation
+- Classification
 
-For detailed config examples for each of them, please refer to [docs/mnist.md](docs/mnist.md).
+See [docs/mnist.md](docs/mnist.md) for configs.
 
-The corresponding pixi commands:
-
-- Step 1:
+Step 1:
 ```
 pixi run mnist_distances --config ./configs/mnist_dist_example.yaml
 ```
 
-- Step 2:
+Step 2:
 ```
 pixi run mnist_classification --config ./configs/mnist_classification_example.yaml
 ```
 
 ## Linting
 
-This project uses [Black](https://black.readthedocs.io/) and [Ruff](https://docs.astral.sh/ruff/) for code style. Run `pixi run lint` or `ruff check .` to lint the code.
+Run `pixi run lint` or `ruff check .`.
