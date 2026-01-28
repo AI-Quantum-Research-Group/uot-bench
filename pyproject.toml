@@ -3,11 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "uot"
-version = "0.1.15"
-description = "Library for comparison of Optimal Transport algorithms"
+name = "uot_bench"
+version = "0.1.0"
+description = "Utilities for optimal transport algorithms and benchmarking"
 readme = "README.md"
 authors = [
+    { name = "Ivan Zhytkevych", email = "aipyth.func@gmail.com" },
     { name = "Maksym-Vasyl Tarnavskyi", email = "tarnavskyi.pn@ucu.edu.ua" },
     { name = "Maksym Zhuk", email = "zhuk.pn@ucu.edu.ua" },
 ]
@@ -17,22 +18,58 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
+    "POT",
+    "PyYAML",
+    "chex",
+    "gpu-tracker",
+    "h5py",
+    "jax",
+    "jaxopt",
     "numpy",
-    "tqdm",
-    "jax[cuda12]",
-    "jaxlib",
+    "optax",
+    "pandas",
     "scikit-learn",
-    "pot",
-    "open3d",
-    "ott-jax",
-    "memory_profiler",
-    "pytest>=7.0",
-    "hdf5",
-    "PyYAML"
+    "scipy",
+    "toolz",
+    "tqdm",
 ]
 requires-python = ">=3.11"
 
+[project.urls]
+Homepage = "https://github.com/AI-Quantum-Research-Group/uot-bench"
+Repository = "https://github.com/AI-Quantum-Research-Group/uot-bench"
+Issues = "https://github.com/AI-Quantum-Research-Group/uot-bench/issues"
+
 [project.optional-dependencies]
+cuda12 = [
+    "jax[cuda12]",
+]
+color-transfer = [
+    "dash",
+    "opencv-python",
+    "Pillow",
+    "scikit-image",
+    "plotly",
+    "matplotlib",
+]
+gurobi = [
+    "gurobipy",
+]
+image-analysis = [
+    "Pillow",
+    "scikit-image",
+    "matplotlib",
+    "seaborn",
+    "dataframe-image",
+    "ipython",
+]
+viz = [
+    "matplotlib",
+    "plotly",
+    "seaborn",
+    "dataframe-image",
+    "ipython",
+]
 testing = [
     "pytest>=7.0",
 ]
@@ -41,10 +78,12 @@ lint = [
     "ruff>=0.4.1",
 ]
 
-[tool.setuptools]
-packages = [
-    "uot",
-]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["uot*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "__pycache__/*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

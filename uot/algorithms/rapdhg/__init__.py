@@ -4,7 +4,6 @@ __version__ = "0.1.0.dev"
 from .rapdhg import raPDHG
 # from .mp_io import create_lp, create_qp, create_qp_from_gurobi
 from .utils import plot_convergence, create_ot_problem
-import gurobipy as gp
 
 # def read_mps(filename):
 #     model = gp.read(filename)

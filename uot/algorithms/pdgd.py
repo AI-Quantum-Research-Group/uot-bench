@@ -1,12 +1,6 @@
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
 from jax import jit
-import ot
-import ot.plot
-from jax.scipy.stats import norm
-import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import trange
 from typing import NamedTuple
 jax.config.update("jax_enable_x64", True)
 
