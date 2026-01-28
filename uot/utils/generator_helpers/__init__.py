@@ -12,6 +12,14 @@ from .cauchy import (
     get_cauchy_pdf
 )
 from .exponential import get_exponential_pdf
+from .shapes import (
+    DEFAULT_SHAPE_NAMES,
+    get_xy_grid,
+    get_shape_factories,
+    get_all_shape_fields,
+    get_shape_fields,
+    get_measures_weights,
+)
 
 __all__ = [
     "get_axes",
@@ -22,4 +30,10 @@ __all__ = [
     "generate_cauchy_parameters",
     "get_cauchy_pdf",
     "get_exponential_pdf",
+    "DEFAULT_SHAPE_NAMES",
+    "get_xy_grid",
+    "get_shape_factories",
+    "get_all_shape_fields",
+    "get_shape_fields",
+    "get_measures_weights",
 ]

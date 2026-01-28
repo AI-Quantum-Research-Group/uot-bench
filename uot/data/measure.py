@@ -14,10 +14,95 @@ def _any_jax(seq: Sequence) -> bool:
     return any(_is_jax_array(x) for x in seq)
 
 
+def _as_2d(points) -> np.ndarray:
+    arr = np.asarray(points)
+    if arr.ndim == 1:
+        arr = arr.reshape(-1, 1)
+    return arr
+
+
+def _snap_points(points, *, atol: float = 0.0, rtol: float = 0.0) -> np.ndarray:
+    arr = _as_2d(points)
+    if atol <= 0 and rtol <= 0:
+        return arr
+    scale = atol
+    if scale <= 0:
+        max_abs = float(np.max(np.abs(arr))) if arr.size else 0.0
+        scale = rtol * max_abs
+    if scale <= 0:
+        return arr
+    return np.round(arr / scale) * scale
+
+
+def _row_view(arr: np.ndarray) -> np.ndarray:
+    arr = np.ascontiguousarray(arr)
+    return arr.view([("", arr.dtype)] * arr.shape[1]).reshape(-1)
+
+
+def _align_weights(
+    points,
+    weights,
+    support,
+    *,
+    atol: float = 0.0,
+    rtol: float = 0.0,
+) -> ArrayLike:
+    points_np = _snap_points(points, atol=atol, rtol=rtol)
+    support_np = _snap_points(support, atol=atol, rtol=rtol)
+
+    if points_np.shape[1] != support_np.shape[1]:
+        raise ValueError(
+            f"Support dimension mismatch: {points_np.shape[1]} vs {support_np.shape[1]}"
+        )
+
+    weights_np = np.asarray(weights)
+    if weights_np.shape[0] != points_np.shape[0]:
+        raise ValueError(
+            f"weights length {weights_np.shape[0]} does not match points {points_np.shape[0]}"
+        )
+
+    support_view = _row_view(support_np)
+    points_view = _row_view(points_np)
+
+    order = np.argsort(support_view)
+    sorted_support = support_view[order]
+    idx = np.searchsorted(sorted_support, points_view)
+    valid = (idx < sorted_support.size)
+    idx = idx[valid]
+    points_view = points_view[valid]
+    weights_np = weights_np[valid]
+
+    matches = sorted_support[idx] == points_view
+    support_idx = order[idx[matches]]
+
+    aligned = np.zeros((support_np.shape[0],), dtype=weights_np.dtype)
+    np.add.at(aligned, support_idx, weights_np[matches])
+
+    want_jax = _is_jax_array(support) or _is_jax_array(weights) or _is_jax_array(points)
+    return jnp.asarray(aligned) if want_jax else aligned
+
+
 class BaseMeasure(ABC):
     @abstractmethod
     def to_discrete(self, include_zeros: bool = True) -> tuple[ArrayLike, ArrayLike]:
         """Return (points, weights) that approximate this measure as the discrete one"""
+        ...
+
+    @abstractmethod
+    def support(self, include_zeros: bool = True) -> ArrayLike:
+        """Return support points for this measure."""
+        ...
+
+    @abstractmethod
+    def weights_on(
+        self,
+        support: ArrayLike,
+        *,
+        include_zeros: bool = True,
+        atol: float = 0.0,
+        rtol: float = 0.0,
+    ) -> ArrayLike:
+        """Return weights aligned to a provided support."""
         ...
 
 
@@ -39,6 +124,21 @@ class DiscreteMeasure(BaseMeasure):
             return self._points, self._weights
         mask = self._weights > 0
         return self._points[mask], self._weights[mask]
+
+    def support(self, include_zeros: bool = True) -> ArrayLike:
+        points, _ = self.to_discrete(include_zeros=include_zeros)
+        return points
+
+    def weights_on(
+        self,
+        support: ArrayLike,
+        *,
+        include_zeros: bool = True,
+        atol: float = 0.0,
+        rtol: float = 0.0,
+    ) -> ArrayLike:
+        points, weights = self.to_discrete(include_zeros=include_zeros)
+        return _align_weights(points, weights, support, atol=atol, rtol=rtol)
 
 
 class GridMeasure:
@@ -123,6 +223,21 @@ class GridMeasure:
             name=self.name,
             normalize=False,
         )
+
+    def support(self, include_zeros: bool = True) -> ArrayLike:
+        points, _ = self.to_discrete(include_zeros=include_zeros)
+        return points
+
+    def weights_on(
+        self,
+        support: ArrayLike,
+        *,
+        include_zeros: bool = True,
+        atol: float = 0.0,
+        rtol: float = 0.0,
+    ) -> ArrayLike:
+        points, weights = self.to_discrete(include_zeros=include_zeros)
+        return _align_weights(points, weights, support, atol=atol, rtol=rtol)
 
     # Small utilities
     @property

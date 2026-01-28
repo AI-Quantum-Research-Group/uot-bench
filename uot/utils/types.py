@@ -1,4 +1,4 @@
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TypeAlias, TYPE_CHECKING, Literal
 import numpy as np
 
 if TYPE_CHECKING:
@@ -8,3 +8,5 @@ if TYPE_CHECKING:
 else:
     # At runtime, we only need to know that ArrayLike is at least a numpy.ndarray
     ArrayLike: TypeAlias = np.ndarray
+
+MeasureMode: TypeAlias = Literal['grid', 'discrete']

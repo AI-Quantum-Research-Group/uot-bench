@@ -2,7 +2,12 @@ from abc import ABC
 import hashlib
 import pickle
 from collections.abc import Callable
-from uot.data.measure import BaseMeasure
+
+import numpy as np
+import jax
+import jax.numpy as jnp
+
+from uot.data.measure import BaseMeasure, _snap_points, _row_view
 from uot.utils.types import ArrayLike
 
 
@@ -49,6 +54,65 @@ class MarginalProblem(ABC):
 
     def get_costs(self) -> list[ArrayLike]:
         raise NotImplementedError()
+
+    def shared_support(
+        self,
+        *,
+        mode: str = "union",
+        include_zeros: bool = True,
+        atol: float = 0.0,
+        rtol: float = 0.0,
+    ) -> ArrayLike:
+        supports = [m.support(include_zeros=include_zeros) for m in self.get_marginals()]
+        if not supports:
+            return np.zeros((0, 0))
+
+        want_jax = any(isinstance(s, jax.Array) for s in supports)
+
+        if mode == "first":
+            support = supports[0]
+            return jnp.asarray(support) if want_jax else np.asarray(support)
+
+        supports_np = [_snap_points(s, atol=atol, rtol=rtol) for s in supports]
+
+        if mode == "union":
+            stacked = np.concatenate(supports_np, axis=0)
+            view = _row_view(stacked)
+            _, idx = np.unique(view, return_index=True)
+            support = stacked[np.sort(idx)]
+        elif mode == "intersection":
+            support = supports_np[0]
+            for other in supports_np[1:]:
+                mask = np.in1d(_row_view(support), _row_view(other))
+                support = support[mask]
+        else:
+            raise ValueError("mode must be 'union', 'intersection', or 'first'")
+
+        return jnp.asarray(support) if want_jax else support
+
+    def weights_on_shared_support(
+        self,
+        *,
+        mode: str = "union",
+        include_zeros: bool = True,
+        atol: float = 0.0,
+        rtol: float = 0.0,
+    ) -> tuple[ArrayLike, ArrayLike]:
+        support = self.shared_support(
+            mode=mode,
+            include_zeros=include_zeros,
+            atol=atol,
+            rtol=rtol,
+        )
+        weights = [
+            m.weights_on(support, include_zeros=include_zeros, atol=atol, rtol=rtol)
+            for m in self.get_marginals()
+        ]
+        want_jax = isinstance(support, jax.Array) or any(isinstance(w, jax.Array) for w in weights)
+        xp = jnp if want_jax else np
+        support = xp.asarray(support)
+        weights = xp.stack([xp.asarray(w) for w in weights], axis=0)
+        return support, weights
 
     def to_dict(self) -> dict:
         raise NotImplementedError()
