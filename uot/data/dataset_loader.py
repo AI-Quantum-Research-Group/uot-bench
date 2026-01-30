@@ -109,3 +109,55 @@ def load_image_as_color_grid(
         bins_per_channel=bins_per_channel,
         use_jax=use_jax
     )
+
+
+def load_image_as_binary_grid(
+    path: str,
+    *,
+    size: tuple[int, int] | None = None,
+    resample: int | None = None,
+    threshold: float = 0.5,
+    invert: bool = False,
+    use_jax: bool = False,
+    normalize: bool = True,
+    axes_mode: str = "normalized",  # "normalized" | "pixel"
+) -> GridMeasure:
+    """
+    Load a PNG/JPG image as a 2D binary GridMeasure (0/1), then optionally normalize.
+
+    - threshold is applied on grayscale intensities in [0, 1].
+    - axes_mode="normalized" creates axes in [0,1]; "pixel" uses 0..H-1 and 0..W-1.
+    """
+    image = Image.open(path).convert("L")
+    if size is not None:
+        resample_mode = Image.BILINEAR if resample is None else resample
+        image = image.resize(size, resample=resample_mode)
+    data = np.asarray(image, dtype=np.float64) / 255.0
+
+    if invert:
+        data = 1.0 - data
+
+    binary = (data >= threshold).astype(np.float64)
+
+    if normalize:
+        total = binary.sum()
+        if total > 0:
+            binary = binary / total
+
+    if axes_mode == "normalized":
+        ax0 = np.linspace(0.0, 1.0, binary.shape[0])
+        ax1 = np.linspace(0.0, 1.0, binary.shape[1])
+    elif axes_mode == "pixel":
+        ax0 = np.arange(binary.shape[0])
+        ax1 = np.arange(binary.shape[1])
+    else:
+        raise ValueError("axes_mode must be 'normalized' or 'pixel'")
+
+    if use_jax:
+        axes = [jnp.asarray(ax0), jnp.asarray(ax1)]
+        weights_nd = jnp.asarray(binary)
+    else:
+        axes = [ax0, ax1]
+        weights_nd = binary
+
+    return GridMeasure(axes=axes, weights_nd=weights_nd, normalize=False)
