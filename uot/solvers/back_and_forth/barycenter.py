@@ -24,6 +24,12 @@ from uot.utils.central_gradient_nd import _central_gradient_nd
 from .method import backnforth_sqeuclidean_nd
 # from .pushforward import adaptive_pushforward_nd
 from .forward_pushforward import cic_pushforward_nd
+from .pushforward import adaptive_pushforward_nd
+from .monge_map import (
+    monge_map_from_psi_nd,
+    monge_map_cic_from_psi_nd,
+    monge_map_adaptive_from_psi_nd,
+)
 
 
 def _stack_measures(measures_weights):
@@ -45,6 +51,14 @@ def _stack_measures(measures_weights):
     return jnp.stack(list(measures_weights), axis=0)
 
 
+def _resolve_monge_map_fn(pushforward_fn: Callable) -> Callable:
+    if pushforward_fn is adaptive_pushforward_nd:
+        return monge_map_adaptive_from_psi_nd
+    if pushforward_fn is cic_pushforward_nd:
+        return monge_map_cic_from_psi_nd
+    return monge_map_from_psi_nd
+
+
 @partial(
     jax.jit,
     static_argnames=(
@@ -52,6 +66,7 @@ def _stack_measures(measures_weights):
         "transport_maxiter",
         "pushforward_fn",
         "transport_error_metric",
+        "return_monge_maps",
     ),
 )
 def backnforth_barycenter_sqeuclidean_nd_jax(
@@ -67,6 +82,7 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
     transport_tol: float = 1e-3,
     transport_error_metric: str = "h1_psi_relative",
     pushforward_fn: Optional[Callable] = cic_pushforward_nd,
+    return_monge_maps: bool = False,
 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
     """Compute a Wasserstein barycenter with a JAX-jitted back-and-forth solver.
 
@@ -109,6 +125,9 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
         Pushforward function used to update the barycenter with the aggregated
         PSI potential. Must accept ``(mu, potential)`` and return a tuple
         ``(pushed_density, aux)``.
+    return_monge_maps : bool, default=False
+        If True, compute and return the per-measure Monge maps for the final
+        barycenter in the diagnostics dictionary (key ``"monge_maps"``).
 
     Returns
     -------
@@ -118,9 +137,10 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
         - ``diagnostics`` contains:
           - ``iterations``: scalar number of outer iterations
           - ``final_residual``: scalar residual at termination
-          - ``residual_hist``: array of shape (outer_maxiter,)
-          - ``max_transport_error_hist``: array of shape (outer_maxiter,)
-          - ``max_marginal_error_hist``: array of shape (outer_maxiter,)
+        - ``residual_hist``: array of shape (outer_maxiter,)
+        - ``max_transport_error_hist``: array of shape (outer_maxiter,)
+        - ``max_marginal_error_hist``: array of shape (outer_maxiter,)
+        - ``monge_maps`` (optional): array of shape (J, *gridshape, d)
 
     Notes
     -----
@@ -236,6 +256,14 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
         "max_transport_error_hist": max_transport_hist,  # (outer_maxiter,)
         "max_marginal_error_hist": max_marginal_hist,    # (outer_maxiter,)
     }
+
+    if return_monge_maps:
+        # Re-solve transports from the final barycenter to get final psi's.
+        _, psis_fin, _, _, _ = vmapped_pair_solve(mu_fin, measures)
+        monge_map_fn = _resolve_monge_map_fn(pushforward_fn)
+        monge_maps = jax.vmap(lambda psi: monge_map_fn(psi=-psi), in_axes=0)(psis_fin)
+        monge_maps = jnp.moveaxis(monge_maps, 1, -1)  # (J, *gridshape, d)
+        diagnostics["monge_maps"] = monge_maps
     return mu_fin, diagnostics
 
 
@@ -252,6 +280,7 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
     transport_tol: float = 1e-3,
     transport_error_metric: str = "h1_psi_relative",
     pushforward_fn: Optional[Callable] = cic_pushforward_nd,
+    return_monge_maps: bool = False,
 ):
     """Convenience wrapper for the JAX barycenter solver.
 
@@ -286,6 +315,8 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         Error metric name forwarded to ``backnforth_sqeuclidean_nd``.
     pushforward_fn : Callable | None, default=cic_pushforward_nd
         Pushforward function used for the barycenter update.
+    return_monge_maps : bool, default=False
+        If True, include per-measure Monge maps in the diagnostics output.
 
     Returns
     -------
@@ -309,5 +340,6 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         transport_tol=transport_tol,
         transport_error_metric=transport_error_metric,
         pushforward_fn=pushforward_fn,
+        return_monge_maps=return_monge_maps,
     )
     return mu, diag
