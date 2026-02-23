@@ -115,14 +115,21 @@ layout = dbc.Container(fluid=True, class_name="p-4", children=[
             ])
         ]),
 
-        # Tab 4: Error
-        dcc.Tab(label="Error", value="tab-error", children=[
-            graph_card_single(title="Error vs Runtime", graph_id="desc-error-runtime-scatter"),
-
+        dcc.Tab(label="Pareto Scatter", value="tab-pareto-scatter", children=[
             graph_card_single(
                 title="Pareto scatter: runtime vs cost error (lower-left is better)",
                 graph_id="desc-pareto-scatter"
             ),
+        ]),
+
+        # Tab 4: Error
+        dcc.Tab(label="Error", value="tab-error", children=[
+            # graph_card_single(title="Error vs Runtime", graph_id="desc-error-runtime-scatter"),
+
+            # graph_card_single(
+            #     title="Pareto scatter: runtime vs cost error (lower-left is better)",
+            #     graph_id="desc-pareto-scatter"
+            # ),
 
             graph_card_single(
                 title="Distribution Family Sensitivity (boxplots by family, colored by solver)",
@@ -145,14 +152,14 @@ layout = dbc.Container(fluid=True, class_name="p-4", children=[
         ]),
 
         # Tab 5: Pivot & Resources
-        dcc.Tab(label="Pivot & Resources", value="tab-pivot-resources", children=[
-            html.H4("Pivot Table"),
-            filters.only_converged_filter("desc-median-pivot-only-converged"),
-            html.Div(id="desc-pivot-table", style={"overflowX": "auto"}),
-            html.Hr(),
-            html.H4("Resource Usage"),
-            dcc.Graph(id="desc-resources-violins"),  # uncomment when callback ready
-        ]),
+        # dcc.Tab(label="Pivot & Resources", value="tab-pivot-resources", children=[
+        #     html.H4("Pivot Table"),
+        #     filters.only_converged_filter("desc-median-pivot-only-converged"),
+        #     html.Div(id="desc-pivot-table", style={"overflowX": "auto"}),
+        #     html.Hr(),
+        #     html.H4("Resource Usage"),
+        #     dcc.Graph(id="desc-resources-violins"),  # uncomment when callback ready
+        # ]),
 
         # Tab 6: Summary Tables
         dcc.Tab(

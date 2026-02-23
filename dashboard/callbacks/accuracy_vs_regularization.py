@@ -2,6 +2,7 @@ import dash
 from dash import Output
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.colors as pcolors
 
 from utils.filters import FILTER_INPUTS
 from utils.data import get_filtered, SOLVERS_COLOR_MAP
@@ -24,17 +25,38 @@ def update_accuracy_vs_reg(solvers, regs, dims, datasets, size):
         return fig
 
     df = df.copy()
+    # print(f"{df['reg'].unique()=}")
     df["reg"] = pd.to_numeric(df["reg"], errors="coerce")
     df["cost_rerr"] = pd.to_numeric(df["cost_rerr"], errors="coerce")
 
     reg_values = sorted([float(reg) for reg in df['reg'].unique()])
+    # print(f"{reg_values=}")
 
-    # aggregate: median error per (solver,size)
+    # aggregate: median + quantile bands per (solver,reg)
     summary = (
         df.groupby(["solver", "reg"], dropna=False)
-          .agg(cost_rerr=("cost_rerr", "median"))
+          .agg(
+              cost_rerr=("cost_rerr", "median"),
+              cost_rerr_q05=("cost_rerr", lambda s: s.quantile(0.05)),
+              cost_rerr_q25=("cost_rerr", lambda s: s.quantile(0.25)),
+              cost_rerr_q75=("cost_rerr", lambda s: s.quantile(0.75)),
+              cost_rerr_q95=("cost_rerr", lambda s: s.quantile(0.95)),
+          )
           .reset_index()
     )
+
+    def _color_to_rgba(color, alpha):
+        if isinstance(color, str):
+            if color.startswith("#"):
+                rgb = pcolors.hex_to_rgb(color)
+                return f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {alpha})"
+            if color.startswith("rgb"):
+                inner = color[color.find("(") + 1:color.find(")")]
+                parts = [p.strip() for p in inner.split(",")]
+                if len(parts) >= 3:
+                    r, g, b = (int(float(p)) for p in parts[:3])
+                    return f"rgba({r}, {g}, {b}, {alpha})"
+        return color
 
     fig = go.Figure()
 
@@ -47,12 +69,59 @@ def update_accuracy_vs_reg(solvers, regs, dims, datasets, size):
             ['circle', 'square', 'diamond', 'cross', 'star', 'x', 'hexagram',
              'triangle-up', 'circle-cross', 'square-cross']
         )}
-    print(f"{MARKER_MAP=}")
+    # print(f"{MARKER_MAP=}")
     for sol in solver_list:
         # for reg in regs:
         d = summary[(summary["solver"] == sol)]
         # d = summary[(summary["solver"] == sol) & (summary['reg'] == reg)]
         color = SOLVERS_COLOR_MAP[sol]
+        d = d.sort_values("reg")
+        # 5-95% band
+        # fig.add_trace(
+        #     go.Scatter(
+        #         x=d["reg"],
+        #         y=d["cost_rerr_q05"],
+        #         mode="lines",
+        #         line=dict(width=0),
+        #         hoverinfo="skip",
+        #         showlegend=False,
+        #     )
+        # )
+        # fig.add_trace(
+        #     go.Scatter(
+        #         x=d["reg"],
+        #         y=d["cost_rerr_q95"],
+        #         mode="lines",
+        #         line=dict(width=0),
+        #         fill="tonexty",
+        #         fillcolor=_color_to_rgba(color, 0.12),
+        #         hoverinfo="skip",
+        #         showlegend=False,
+        #     )
+        # )
+        # IQR band
+        fig.add_trace(
+            go.Scatter(
+                x=d["reg"],
+                y=d["cost_rerr_q25"],
+                mode="lines",
+                line=dict(width=0),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=d["reg"],
+                y=d["cost_rerr_q75"],
+                mode="lines",
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor=_color_to_rgba(color, 0.25),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
         # symbol = MARKER_MAP[reg]
         # d = d.sort_values("size")
         fig.add_trace(

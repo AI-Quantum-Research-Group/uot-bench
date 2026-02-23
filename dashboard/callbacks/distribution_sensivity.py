@@ -111,7 +111,7 @@ def update_distribution_sensitivity(solvers, regs, dims, datasets, size):
         title="Dataset family",
         categoryorder="array",
         categoryarray=ordered,
-        tickangle=0
+        tickangle=-45
     )
 
     fig.update_yaxes(
@@ -121,6 +121,7 @@ def update_distribution_sensitivity(solvers, regs, dims, datasets, size):
 
     fig.update_layout(
         # title="Distribution Family Sensitivity (boxplots by family, colored by solver)",
+        height=700,
         margin=dict(l=80, r=20, t=60, b=60),
         template="plotly_white",
         legend=dict(title="Solver"),

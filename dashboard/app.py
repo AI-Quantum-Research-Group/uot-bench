@@ -55,7 +55,10 @@ navbar = dbc.NavbarSimple(
     children=[
         # color_mode_switch,
         dbc.NavItem(dbc.NavLink("Descriptive Analysis", href="/descriptive")),
+        dbc.NavItem(dbc.NavLink("Back & Forth", href="/back-and-forth")),
         dbc.NavItem(dbc.NavLink("Inferential Analysis", href="/inferential")),
+        dbc.NavItem(dbc.NavLink("Color Transfer Showcase", href="/color_transfer")),
+        dbc.NavItem(dbc.NavLink("Color Transfer Statistics", href="/color_transfer_stats")),
     ],
     className="mb-2",
 )

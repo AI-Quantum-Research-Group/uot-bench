@@ -82,3 +82,31 @@ def only_converged_filter(id):
             inline=True,
         ),
     ],)
+
+
+def switch_filter(label, filter_id, options, value, width=3, inline=True):
+    return dbc.Col([
+        html.Label(label),
+        dbc.Checklist(
+            id=filter_id,
+            options=options,
+            value=value,
+            switch=True,
+            persistence=True,
+            inline=inline,
+        ),
+    ], width=width)
+
+
+def dropdown_filter(label, filter_id, options, value, width=3, multi=True, placeholder=None):
+    return dbc.Col([
+        html.Label(label),
+        dcc.Dropdown(
+            id=filter_id,
+            options=options,
+            value=value,
+            multi=multi,
+            placeholder=placeholder,
+            persistence=True,
+        ),
+    ], width=width)
