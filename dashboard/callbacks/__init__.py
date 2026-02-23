@@ -36,3 +36,14 @@ from .runtime_size_growth_table import *
 
 from .accuracy_vs_regularization import *
 from .error_vs_size import *
+from .bfm_performance_summary import *
+from .bfm_monge_summary import *
+from .bfm_stepsize_heatmap import *
+from .bfm_monge_heatmap import *
+from .bfm_monge_core_heatmap import *
+from .bfm_cost_difference import *
+from .bfm_tv_vs_size import *
+from .bfm_violin_grid import *
+from .bfm_summary_table import *
+from .home_coverage_matrix import *
+from .color_transfer_stats import *
