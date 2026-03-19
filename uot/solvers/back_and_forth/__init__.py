@@ -1,1 +1,2 @@
 from .solver import BackNForthSqEuclideanSolver
+from .barycenter import build_gibbs_nu, solve_barycenter_back_and_forth

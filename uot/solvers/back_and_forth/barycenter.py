@@ -25,6 +25,7 @@ from .method import backnforth_sqeuclidean_nd
 # from .pushforward import adaptive_pushforward_nd
 from .forward_pushforward import cic_pushforward_nd
 from .pushforward import adaptive_pushforward_nd
+from .c_transform import c_transform_quadratic_fast
 from .monge_map import (
     monge_map_from_psi_nd,
     monge_map_cic_from_psi_nd,
@@ -343,3 +344,219 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         return_monge_maps=return_monge_maps,
     )
     return mu, diag
+
+
+def _density_mismatch(a: jnp.ndarray, b: jnp.ndarray, norm: str = "l2") -> jnp.ndarray:
+    diff = a - b
+    if norm == "l1":
+        return jnp.sum(jnp.abs(diff))
+    if norm == "l2":
+        return jnp.linalg.norm(diff.reshape(-1))
+    raise ValueError(f"Unsupported mismatch norm '{norm}'. Use 'l1' or 'l2'.")
+
+
+def build_gibbs_nu(
+    phi_list: Sequence[jnp.ndarray],
+    lambda_list: Sequence[float] | jnp.ndarray,
+    gamma: float,
+    *,
+    cell_volume: Optional[float] = None,
+    eps: float = 1e-30,
+) -> jnp.ndarray:
+    """Build the Gibbs barycenter iterate from weighted phi-potentials."""
+    if len(phi_list) == 0:
+        raise ValueError("phi_list must contain at least one potential array.")
+    if gamma <= 0:
+        raise ValueError("gamma must be strictly positive.")
+
+    phi_stack = jnp.stack([jnp.asarray(phi) for phi in phi_list], axis=0)
+    weights = jnp.asarray(lambda_list, dtype=phi_stack.dtype)
+    if weights.ndim != 1 or weights.shape[0] != phi_stack.shape[0]:
+        raise ValueError(
+            f"lambda_list must have shape ({phi_stack.shape[0]},), got {weights.shape}."
+        )
+    weights = weights / jnp.maximum(weights.sum(), jnp.asarray(eps, dtype=weights.dtype))
+
+    weighted_phi = jnp.tensordot(weights, phi_stack, axes=(0, 0))
+    V = weighted_phi / jnp.asarray(gamma, dtype=phi_stack.dtype)
+    logits = -V
+    logits = logits - jnp.max(logits)
+    nu_unnorm = jnp.exp(logits)
+
+    if cell_volume is not None:
+        nu_unnorm = nu_unnorm * jnp.asarray(cell_volume, dtype=nu_unnorm.dtype)
+
+    normalizer = jnp.maximum(nu_unnorm.sum(), jnp.asarray(eps, dtype=nu_unnorm.dtype))
+    return nu_unnorm / normalizer
+
+
+def solve_barycenter_back_and_forth(
+    mu_list: Sequence[jnp.ndarray],
+    lambda_list: Sequence[float] | jnp.ndarray,
+    gamma: float,
+    params: Optional[dict] = None,
+):
+    """
+    Entropy-regularized barycenter outer loop using existing two-marginal back-and-forth pieces.
+
+    Returns
+    -------
+    tuple
+        (nu, phi_list, psi_list, diagnostics)
+    """
+    params = {} if params is None else dict(params)
+    if len(mu_list) == 0:
+        raise ValueError("mu_list must contain at least one marginal.")
+
+    mus = [jnp.asarray(mu) for mu in mu_list]
+    shape0 = mus[0].shape
+    for idx, mu in enumerate(mus):
+        if mu.shape != shape0:
+            raise ValueError(
+                f"All marginals must share one grid shape. mu_list[0]={shape0}, "
+                f"mu_list[{idx}]={mu.shape}."
+            )
+
+    coordinates = params.get("coordinates")
+    if coordinates is None:
+        raise ValueError("params['coordinates'] is required.")
+
+    formulation = str(params.get("formulation", "phi")).lower()
+    if formulation not in {"phi", "psi"}:
+        raise ValueError("params['formulation'] must be 'phi' or 'psi'.")
+
+    num_outer_iters = int(params.get("num_outer_iters", 10))
+    eta = jnp.asarray(params.get("eta", 1.0), dtype=mus[0].dtype)
+    outer_tol = params.get("outer_tol")
+    mismatch_norm = str(params.get("mismatch_norm", "l2")).lower()
+    log_every = max(int(params.get("log_every", 1)), 1)
+    verbose = bool(params.get("verbose", False))
+    cell_volume = params.get("cell_volume")
+
+    c_transform_fn = params.get(
+        "c_transform_fn",
+        partial(c_transform_quadratic_fast, coords_list=coordinates),
+    )
+    two_marginal_solver = params.get("two_marginal_solver", backnforth_sqeuclidean_nd)
+    pushforward_fn = params.get("pushforward_fn", adaptive_pushforward_nd)
+
+    apply_h1_inverse = params.get("apply_h1_inverse")
+    if apply_h1_inverse is None:
+        def _identity(rhs):
+            return rhs
+        apply_h1_inverse = _identity
+
+    solver_kwargs = dict(params.get("two_marginal_params", {}))
+    stepsize = solver_kwargs.pop("stepsize", params.get("stepsize", 1.0))
+    maxiterations = int(solver_kwargs.pop("maxiterations", params.get("maxiterations", 500)))
+    tolerance = solver_kwargs.pop("tolerance", params.get("tolerance", 1e-3))
+    stepsize_lower_bound = solver_kwargs.pop(
+        "stepsize_lower_bound",
+        params.get("stepsize_lower_bound", 0.01),
+    )
+    error_metric = solver_kwargs.pop(
+        "error_metric",
+        params.get("error_metric", "h1_psi_relative"),
+    )
+    progressbar = bool(solver_kwargs.pop("progressbar", False))
+
+    init_phi_list = params.get("init_phi_list")
+    if init_phi_list is None:
+        phi_list = [jnp.zeros_like(mu) for mu in mus]
+    else:
+        if len(init_phi_list) != len(mus):
+            raise ValueError("init_phi_list must match len(mu_list).")
+        phi_list = [jnp.asarray(phi) for phi in init_phi_list]
+
+    init_psi_list = params.get("init_psi_list")
+    if init_psi_list is None:
+        psi_list = [jnp.zeros_like(mu) for mu in mus]
+    else:
+        if len(init_psi_list) != len(mus):
+            raise ValueError("init_psi_list must match len(mu_list).")
+        psi_list = [jnp.asarray(psi) for psi in init_psi_list]
+
+    weights = jnp.asarray(lambda_list, dtype=mus[0].dtype)
+    if weights.ndim != 1 or weights.shape[0] != len(mus):
+        raise ValueError(f"lambda_list must have shape ({len(mus)},), got {weights.shape}.")
+    weights = weights / jnp.maximum(weights.sum(), jnp.finfo(weights.dtype).eps)
+
+    mass_hist = []
+    mismatch_hist = []
+    max_mismatch_hist = []
+    inner_iter_hist = []
+    nu = build_gibbs_nu(phi_list, weights, gamma, cell_volume=cell_volume)
+    nu_push_list = [jnp.zeros_like(mus[0]) for _ in mus]
+
+    for outer_idx in range(num_outer_iters):
+        if formulation == "phi":
+            psi_list = [c_transform_fn(phi) for phi in phi_list]
+        else:
+            # Keep the driver interface formulation-aware; psi-variant is left for later.
+            phi_list = [c_transform_fn(psi) for psi in psi_list]
+            raise NotImplementedError(
+                "psi-formulation is not implemented yet; use params['formulation']='phi'."
+            )
+
+        nu = build_gibbs_nu(phi_list, weights, gamma, cell_volume=cell_volume)
+
+        mismatches = []
+        inner_iters = []
+        for i, mu in enumerate(mus):
+            # Reuse existing two-marginal back-and-forth solver unchanged.
+            pair_result = two_marginal_solver(
+                mu=mu,
+                nu=nu,
+                coordinates=coordinates,
+                stepsize=stepsize / jnp.maximum(mu.max(), nu.max()),
+                maxiterations=maxiterations,
+                tolerance=tolerance,
+                progressbar=progressbar,
+                pushforward_fn=pushforward_fn,
+                stepsize_lower_bound=stepsize_lower_bound,
+                error_metric=error_metric,
+                **solver_kwargs,
+            )
+
+            inner_iters.append(int(pair_result[0]))
+            phi_i = pair_result[1]
+            psi_i = pair_result[2]
+            phi_list[i] = phi_i
+            psi_list[i] = psi_i
+
+            # Reuse the existing pushforward implementation directly.
+            nu_i, _ = pushforward_fn(mu, -psi_i)
+            nu_push_list[i] = nu_i
+            rhs_i = weights[i] * (nu_i - nu)
+            phi_update = jnp.asarray(apply_h1_inverse(rhs_i), dtype=phi_i.dtype)
+            phi_list[i] = phi_i + eta * phi_update
+
+            mismatches.append(float(_density_mismatch(nu_i, nu, norm=mismatch_norm)))
+
+        mass_nu = float(jnp.sum(nu))
+        max_mismatch = max(mismatches) if mismatches else 0.0
+        mass_hist.append(mass_nu)
+        mismatch_hist.append(mismatches)
+        max_mismatch_hist.append(max_mismatch)
+        inner_iter_hist.append(inner_iters)
+
+        if verbose and (outer_idx % log_every == 0):
+            mismatch_str = ", ".join(f"{m:.3e}" for m in mismatches)
+            print(
+                f"[outer {outer_idx + 1:03d}] mass(nu)={mass_nu:.8f} "
+                f"||nu_i-nu||=({mismatch_str}) max={max_mismatch:.3e}"
+            )
+
+        if outer_tol is not None and max_mismatch <= float(outer_tol):
+            break
+
+    diagnostics = {
+        "iterations": len(mass_hist),
+        "mass_nu": jnp.asarray(mass_hist, dtype=mus[0].dtype),
+        "nu_mismatch": jnp.asarray(mismatch_hist, dtype=mus[0].dtype),
+        "max_nu_mismatch": jnp.asarray(max_mismatch_hist, dtype=mus[0].dtype),
+        "inner_iterations": jnp.asarray(inner_iter_hist, dtype=jnp.int32),
+        "nu_pushforwards": jnp.stack(nu_push_list, axis=0),
+        "formulation": formulation,
+    }
+    return nu, phi_list, psi_list, diagnostics
