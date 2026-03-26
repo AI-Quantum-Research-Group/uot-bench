@@ -14,7 +14,11 @@ from .cauchy import (
 from .exponential import get_exponential_pdf
 from .shapes import (
     DEFAULT_SHAPE_NAMES,
+    build_measures_from_fields,
+    get_packaged_image_name_map,
     get_xy_grid,
+    get_toy_source_factories,
+    get_toy_source_fields,
     get_shape_factories,
     get_all_shape_fields,
     get_shape_fields,
@@ -31,7 +35,11 @@ __all__ = [
     "get_cauchy_pdf",
     "get_exponential_pdf",
     "DEFAULT_SHAPE_NAMES",
+    "build_measures_from_fields",
+    "get_packaged_image_name_map",
     "get_xy_grid",
+    "get_toy_source_factories",
+    "get_toy_source_fields",
     "get_shape_factories",
     "get_all_shape_fields",
     "get_shape_fields",

@@ -7,3 +7,8 @@ from .independent_cauchy import IndependentCauchyGenerator
 from .independent_exponential import IndependentExponentialGenerator
 from .generalized_hyperbolic_mixture import GeneralizedHyperbolicMixtureGenerator
 from .students_t import StudentTGenerator
+from .toy_barycenter_generator import (
+    ToyBarycenterGenerator,
+    FixedListSelector,
+    RoundRobinSelector,
+)

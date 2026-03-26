@@ -20,6 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "POT",
+    "Pillow",
     "PyYAML",
     "chex",
     "gpu-tracker",
@@ -29,6 +30,7 @@ dependencies = [
     "numpy",
     "optax",
     "pandas",
+    "scikit-image",
     "scikit-learn",
     "scipy",
     "toolz",
@@ -82,6 +84,9 @@ lint = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["uot*"]
+
+[tool.setuptools.package-data]
+"uot.assets.toy_shapes" = ["*.png", "*.jpg", "*.jpeg", "*.webp"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["*.pyc", "__pycache__/*"]

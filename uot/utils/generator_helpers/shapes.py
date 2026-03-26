@@ -1,10 +1,18 @@
-from collections.abc import Callable
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from importlib import resources
+from pathlib import Path
 
 import jax.numpy as jnp
+import numpy as np
 
-from uot.utils.types import ArrayLike
+from uot.utils.build_measure import _build_measure
+from uot.utils.types import ArrayLike, MeasureMode
 
 DEFAULT_SHAPE_NAMES = ("Ring", "Crescent", "Checker")
+TOY_IMAGE_PACKAGE = "uot.assets.toy_shapes"
+TOY_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def get_xy_grid(axes: list[ArrayLike]) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -20,7 +28,13 @@ def normalize_field(field: ArrayLike, eps: float = 1e-9) -> jnp.ndarray:
     return field / total if total > eps else field
 
 
-def diamond_mask(X: ArrayLike, Y: ArrayLike, center_x: float, center_y: float, radius: float) -> jnp.ndarray:
+def diamond_mask(
+    X: ArrayLike,
+    Y: ArrayLike,
+    center_x: float,
+    center_y: float,
+    radius: float,
+) -> jnp.ndarray:
     return (jnp.abs(X - center_x) + jnp.abs(Y - center_y)) <= radius
 
 
@@ -44,29 +58,15 @@ def triangle_sdf_band(
     theta0: float = jnp.pi / 2,
     thickness: float = 0.02,
 ) -> jnp.ndarray:
-    """
-    Thick outline (band) of an equilateral triangle.
-    Returns boolean mask of shape (n,n).
-    """
-    p = jnp.stack([X - cx, Y - cy], axis=-1)  # (n,n,2)
-
-    # triangle vertices (CCW) on circumcircle radius R
+    p = jnp.stack([X - cx, Y - cy], axis=-1)
     angles = theta0 + jnp.array([0.0, 2 * jnp.pi / 3, 4 * jnp.pi / 3])
-    V = jnp.stack([R * jnp.cos(angles), R * jnp.sin(angles)], axis=1)  # (3,2)
-
-    # edges and outward normals for CCW polygon
-    Vn = jnp.roll(V, shift=-1, axis=0)  # next vertex
-    E = Vn - V  # (3,2)
-    n_out = jnp.stack([E[:, 1], -E[:, 0]], axis=1)  # right normal = outward for CCW
+    V = jnp.stack([R * jnp.cos(angles), R * jnp.sin(angles)], axis=1)
+    Vn = jnp.roll(V, shift=-1, axis=0)
+    E = Vn - V
+    n_out = jnp.stack([E[:, 1], -E[:, 0]], axis=1)
     n_out = n_out / (jnp.linalg.norm(n_out, axis=1, keepdims=True) + 1e-12)
-
-    # signed distance-ish: max over half-space constraints
-    # inside => all dot(n_out, p - V[i]) <= 0
-    # sdf = max_i dot(n_out[i], p - V[i])
-    d = jnp.einsum("...j,ij->...i", p, n_out) - jnp.einsum("ij,ij->i", V, n_out)  # (...,3)
-    sdf = jnp.max(d, axis=-1)  # (n,n)
-
-    # band around boundary
+    d = jnp.einsum("...j,ij->...i", p, n_out) - jnp.einsum("ij,ij->i", V, n_out)
+    sdf = jnp.max(d, axis=-1)
     return jnp.abs(sdf) <= thickness
 
 
@@ -80,8 +80,7 @@ def david_star_density(
 ) -> jnp.ndarray:
     up = triangle_sdf_band(X, Y, cx, cy, R, theta0=jnp.pi / 2, thickness=thickness)
     dn = triangle_sdf_band(X, Y, cx, cy, R, theta0=-jnp.pi / 2, thickness=thickness)
-    star = up | dn
-    return normalize_field(star.astype(jnp.float64))
+    return normalize_field((up | dn).astype(jnp.float64))
 
 
 def ring_density(
@@ -92,8 +91,8 @@ def ring_density(
     outer_radius: float = 0.28,
     inner_radius: float = 0.16,
 ) -> jnp.ndarray:
-    outer = ((X - center_x) ** 2 + (Y - center_y) ** 2) <= outer_radius ** 2
-    inner = ((X - center_x) ** 2 + (Y - center_y) ** 2) >= inner_radius ** 2
+    outer = ((X - center_x) ** 2 + (Y - center_y) ** 2) <= outer_radius**2
+    inner = ((X - center_x) ** 2 + (Y - center_y) ** 2) >= inner_radius**2
     return normalize_field(outer & inner)
 
 
@@ -123,8 +122,8 @@ def crescent_density(
     inner_center_y: float = 0.5,
     inner_radius: float = 0.22,
 ) -> jnp.ndarray:
-    outer = ((X - outer_center_x) ** 2 + (Y - outer_center_y) ** 2) <= outer_radius ** 2
-    inner = ((X - inner_center_x) ** 2 + (Y - inner_center_y) ** 2) <= inner_radius ** 2
+    outer = ((X - outer_center_x) ** 2 + (Y - outer_center_y) ** 2) <= outer_radius**2
+    inner = ((X - inner_center_x) ** 2 + (Y - inner_center_y) ** 2) <= inner_radius**2
     return normalize_field(outer & (~inner))
 
 
@@ -140,8 +139,12 @@ def plus_density(
     h_half_width: float = 0.3,
     h_half_height: float = 0.05,
 ) -> jnp.ndarray:
-    vertical = (jnp.abs(X - v_center_x) <= v_half_width) & (jnp.abs(Y - v_center_y) <= v_half_height)
-    horizontal = (jnp.abs(Y - h_center_y) <= h_half_height) & (jnp.abs(X - h_center_x) <= h_half_width)
+    vertical = (jnp.abs(X - v_center_x) <= v_half_width) & (
+        jnp.abs(Y - v_center_y) <= v_half_height
+    )
+    horizontal = (jnp.abs(Y - h_center_y) <= h_half_height) & (
+        jnp.abs(X - h_center_x) <= h_half_width
+    )
     return normalize_field(vertical | horizontal)
 
 
@@ -176,8 +179,12 @@ def two_squares_density(
     center_y: float = 0.5,
     half_size: float = 0.08,
 ) -> jnp.ndarray:
-    left = (jnp.abs(X - left_center_x) <= half_size) & (jnp.abs(Y - center_y) <= half_size)
-    right = (jnp.abs(X - right_center_x) <= half_size) & (jnp.abs(Y - center_y) <= half_size)
+    left = (jnp.abs(X - left_center_x) <= half_size) & (
+        jnp.abs(Y - center_y) <= half_size
+    )
+    right = (jnp.abs(X - right_center_x) <= half_size) & (
+        jnp.abs(Y - center_y) <= half_size
+    )
     return normalize_field(left | right)
 
 
@@ -204,7 +211,6 @@ def get_shape_factories(
     checker_freq: int = 8,
     star_thickness: float = 0.018,
 ) -> dict[str, Callable[[], jnp.ndarray]]:
-    # Build callables so densities are computed only when requested.
     return {
         "Ring": lambda: ring_density(X, Y),
         "GMM": lambda: gmm_density(X, Y),
@@ -216,6 +222,140 @@ def get_shape_factories(
         "Checker": lambda: checker_density(X, Y, freq=checker_freq),
         "Star": lambda: star_density(X, Y, thickness=star_thickness),
     }
+
+
+def _iter_packaged_image_asset_names() -> list[str]:
+    assets = resources.files(TOY_IMAGE_PACKAGE)
+    return sorted(
+        child.name
+        for child in assets.iterdir()
+        if child.is_file() and child.suffix.lower() in TOY_IMAGE_EXTENSIONS
+    )
+
+
+def get_packaged_image_name_map(
+    *,
+    asset_names: Sequence[str] | None = None,
+    analytic_names: Sequence[str] = (),
+) -> dict[str, str]:
+    if asset_names is None:
+        asset_names = _iter_packaged_image_asset_names()
+
+    name_map: dict[str, str] = {}
+    used_names = set(analytic_names)
+    for asset_name in sorted(asset_names):
+        public_name = Path(asset_name).stem
+        if public_name in used_names:
+            raise ValueError(
+                f"Duplicate toy source name '{public_name}' from asset '{asset_name}'"
+            )
+        name_map[public_name] = asset_name
+        used_names.add(public_name)
+    return name_map
+
+
+def _make_packaged_image_factory(
+    asset_name: str,
+    *,
+    n_points: int,
+    use_jax: bool,
+) -> Callable[[], ArrayLike]:
+    def factory() -> ArrayLike:
+        from uot.data.dataset_loader import load_image_as_binary_grid
+
+        asset = resources.files(TOY_IMAGE_PACKAGE).joinpath(asset_name)
+        with resources.as_file(asset) as asset_path:
+            measure = load_image_as_binary_grid(
+                str(asset_path),
+                size=(n_points, n_points),
+                threshold=0.5,
+                invert=True,
+                normalize=True,
+                axes_mode="normalized",
+                use_jax=use_jax,
+            )
+        return measure.weights_nd
+
+    return factory
+
+
+def get_toy_source_factories(
+    X: ArrayLike,
+    Y: ArrayLike,
+    *,
+    n_points: int,
+    use_jax: bool,
+    checker_freq: int = 8,
+    star_thickness: float = 0.018,
+) -> dict[str, Callable[[], ArrayLike]]:
+    analytic_factories = get_shape_factories(
+        X,
+        Y,
+        checker_freq=checker_freq,
+        star_thickness=star_thickness,
+    )
+    image_name_map = get_packaged_image_name_map(
+        analytic_names=tuple(analytic_factories.keys())
+    )
+
+    factories: dict[str, Callable[[], ArrayLike]] = dict(analytic_factories)
+    for public_name, asset_name in image_name_map.items():
+        factories[public_name] = _make_packaged_image_factory(
+            asset_name,
+            n_points=n_points,
+            use_jax=use_jax,
+        )
+    return factories
+
+
+def get_toy_source_fields(
+    X: ArrayLike,
+    Y: ArrayLike,
+    *,
+    n_points: int,
+    use_jax: bool,
+    source_names: Sequence[str] | None = None,
+    checker_freq: int = 8,
+    star_thickness: float = 0.018,
+) -> dict[str, ArrayLike]:
+    factories = get_toy_source_factories(
+        X,
+        Y,
+        n_points=n_points,
+        use_jax=use_jax,
+        checker_freq=checker_freq,
+        star_thickness=star_thickness,
+    )
+    if source_names is None:
+        source_names = tuple(factories.keys())
+    missing = [name for name in source_names if name not in factories]
+    if missing:
+        raise ValueError(f"Unknown toy source name(s): {', '.join(missing)}")
+    return {name: factories[name]() for name in source_names}
+
+
+def build_measures_from_fields(
+    fields: Sequence[ArrayLike],
+    *,
+    points: ArrayLike,
+    axes: list[ArrayLike],
+    measure_mode: MeasureMode,
+    use_jax: bool,
+):
+    xp = jnp if use_jax else np
+    measures = []
+    for field in fields:
+        weights = field if measure_mode == "grid" else xp.asarray(field).reshape(-1)
+        measures.append(
+            _build_measure(
+                points,
+                weights,
+                axes,
+                measure_mode,
+                use_jax,
+            )
+        )
+    return measures
 
 
 def get_all_shape_fields(
@@ -250,8 +390,7 @@ def get_shape_fields(
         shape_names = DEFAULT_SHAPE_NAMES
     missing = [name for name in shape_names if name not in factories]
     if missing:
-        missing_str = ", ".join(missing)
-        raise ValueError(f"Unknown shape name(s): {missing_str}")
+        raise ValueError(f"Unknown shape name(s): {', '.join(missing)}")
     return {name: factories[name]() for name in shape_names}
 
 
@@ -263,6 +402,5 @@ def get_measures_weights(
         return list(shape_fields.values())
     missing = [name for name in shape_names if name not in shape_fields]
     if missing:
-        missing_str = ", ".join(missing)
-        raise ValueError(f"Unknown shape name(s): {missing_str}")
+        raise ValueError(f"Unknown shape name(s): {', '.join(missing)}")
     return [shape_fields[name] for name in shape_names]

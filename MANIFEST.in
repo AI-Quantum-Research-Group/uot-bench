@@ -1,2 +1,3 @@
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
+recursive-include uot/assets/toy_shapes *.png *.jpg *.jpeg *.webp

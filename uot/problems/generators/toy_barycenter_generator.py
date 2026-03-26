@@ -1,15 +1,17 @@
 from __future__ import annotations
+
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from typing import Protocol, Sequence, Callable
+
 import numpy as np
 import jax
 import jax.numpy as jnp
+
 from uot.problems.barycenter_problem import BarycenterProblem
-from collections.abc import Iterator
 from uot.problems.problem_generator import ProblemGenerator
-from typing import Protocol, Sequence, Callable
-from dataclasses import dataclass, field
 from uot.utils.generator_helpers.get_axes import get_axes, CellDiscretization
 from uot.utils.generator_helpers import shapes
-from uot.utils.build_measure import _build_measure
 from uot.utils.generate_nd_grid import generate_nd_grid
 from uot.utils.types import (
     MeasureMode,
@@ -61,41 +63,39 @@ class ToyBarycenterGenerator(ProblemGenerator):
                         cell_discretization=self.cell_discretization,
                         use_jax=self.use_jax)
         X, Y = shapes.get_xy_grid(axes)
-        self._points = generate_nd_grid(axes, self.use_jax)
-        all_fields_factories = shapes.get_shape_factories(X, Y)
-        available = list(all_fields_factories.keys())
+        points = generate_nd_grid(axes, self.use_jax)
+        toy_source_factories = shapes.get_toy_source_factories(
+            X,
+            Y,
+            n_points=self.n_points,
+            use_jax=self.use_jax,
+        )
+        available = tuple(toy_source_factories.keys())
+        selector_key = self._key if self.use_jax else self._rng
 
-        for i in range(self.num_datasets):
+        for _ in range(self.num_datasets):
             chosen_names = self.selector.select(
                 available=available,
                 k=num_marginals,
-                key=self._rng    # TODO: pass the generator key
+                key=selector_key,
             )
-            chosen_fields = {n: all_fields_factories[n]() for n in chosen_names}
+            chosen_fields = [toy_source_factories[name]() for name in chosen_names]
 
-            measures = []
-            for field in chosen_fields.values():
-                weights = field
-                if self.measure_mode == "discrete":
-                    if self.use_jax:
-                        weights = jnp.asarray(field).reshape(-1)
-                    else:
-                        weights = np.asarray(field).reshape(-1)
-                measures.append(
-                    _build_measure(
-                        self._points,
-                        weights,
-                        axes,
-                        self.measure_mode,
-                        self.use_jax,
-                    )
-                )
-            lambdas = jnp.ones((num_marginals,))
+            measures = shapes.build_measures_from_fields(
+                chosen_fields,
+                points=points,
+                axes=axes,
+                measure_mode=self.measure_mode,
+                use_jax=self.use_jax,
+            )
+            lambdas = jnp.ones((len(measures),))
             lambdas /= lambdas.sum()
-            yield BarycenterProblem(name='ToyExamples',
-                                    measures=measures,
-                                    lambdas=lambdas,
-                                    cost_fn=self.cost_fn)
+            yield BarycenterProblem(
+                name='ToyExamples',
+                measures=measures,
+                lambdas=lambdas,
+                cost_fn=self.cost_fn,
+            )
 
 
 @dataclass(frozen=True)

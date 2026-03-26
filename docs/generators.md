@@ -61,13 +61,13 @@ C = problem.get_costs()[0]
 
 ```python
 from uot.utils.notebook_helpers import one_problem, barycenter_inputs
-from uot.problems.generators.toy_barycenter_generator import (
+from uot.problems.generators import (
     ToyBarycenterGenerator,
     FixedListSelector,
 )
 from uot.utils.costs import cost_euclid_squared
 
-selector = FixedListSelector(names=("Ring", "Square", "Star"))
+selector = FixedListSelector(names=("Ring", "cristo_redentor", "Star"))
 
 gen = ToyBarycenterGenerator(
     selector=selector,
@@ -150,6 +150,34 @@ File: `uot/problems/generators/gaussian_mixture_generator.py`
 - Supports JAX (`use_jax=True`) and NumPy/SciPy backends.
 - Useful for smooth, multi-modal synthetic benchmarks.
 
+### GaussianMixtureBarycenterGenerator
+File: `uot/problems/generators/gaussian_mixture_barycenter_generator.py`
+
+- Barycenter problems with N Gaussian/GMM marginals on a shared grid.
+- Uses the same sampling backends as `GaussianMixtureGenerator`.
+- Set `num_components=1` for single-Gaussian marginals.
+
+Example (Python):
+
+```python
+from uot.problems.generators import GaussianMixtureBarycenterGenerator
+from uot.utils.costs import cost_euclid_squared
+
+gen = GaussianMixtureBarycenterGenerator(
+    name="gmm-bary",
+    dim=2,
+    num_components=1,
+    n_points=64,
+    num_datasets=3,
+    borders=(-5.0, 5.0),
+    cost_fn=cost_euclid_squared,
+    num_marginals=4,
+    use_jax=True,
+)
+
+problem = next(gen.generate())
+```
+
 ### CauchyGenerator
 File: `uot/problems/generators/cauchy_generator.py`
 
@@ -196,22 +224,27 @@ File: `uot/problems/generators/paired_generator.py`
 File: `uot/problems/generators/toy_barycenter_generator.py`
 
 - Builds barycenter problems from simple shape fields on a 2D grid.
-- Uses a `ShapeSelector` to choose which shapes become the marginals.
+- Uses a `ShapeSelector` to choose which toy sources become the marginals.
+- The available names include both analytic shapes and packaged notebook image
+  assets.
+- Image-backed sources use clean selector names derived from filename stems,
+  for example `cristo_redentor`, `motherland_monument_kyiv`, and
+  `toronto_tower`.
 
 Selectors:
-- `FixedListSelector`: use a fixed set of shape names
-- `RoundRobinSelector`: cycle across groups of shapes
+- `FixedListSelector`: use a fixed set of toy-source names
+- `RoundRobinSelector`: cycle across groups of toy-source names
 
 Example (Python):
 
 ```python
-from uot.problems.generators.toy_barycenter_generator import (
+from uot.problems.generators import (
     ToyBarycenterGenerator,
     FixedListSelector,
 )
 from uot.utils.costs import cost_euclid_squared
 
-selector = FixedListSelector(names=("Ring", "Square", "Star"))
+selector = FixedListSelector(names=("Ring", "cristo_redentor", "Star"))
 
 gen = ToyBarycenterGenerator(
     selector=selector,
