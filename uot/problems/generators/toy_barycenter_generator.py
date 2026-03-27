@@ -10,6 +10,7 @@ import jax.numpy as jnp
 
 from uot.problems.barycenter_problem import BarycenterProblem
 from uot.problems.problem_generator import ProblemGenerator
+from uot.utils.costs import cost_euclid_squared
 from uot.utils.generator_helpers.get_axes import get_axes, CellDiscretization
 from uot.utils.generator_helpers import shapes
 from uot.utils.generate_nd_grid import generate_nd_grid
@@ -33,7 +34,7 @@ class ShapeSelector(Protocol):
 class ToyBarycenterGenerator(ProblemGenerator):
     def __init__(self, selector: ShapeSelector,
                  n_points: int,
-                 cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike],
+                 cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
                  num_datasets: int = 1,
                  cell_discretization: CellDiscretization = 'cell-centered',
                  measure_mode: MeasureMode = "grid",

@@ -10,9 +10,9 @@ from uot.utils.generator_helpers import (
     sample_gmm_params_wishart
 )
 from uot.utils.build_measure import _build_measure
+from uot.utils.costs import cost_euclid_squared
 from uot.utils.generator_helpers import get_axes
 from uot.problems.two_marginal import TwoMarginalProblem
-from uot.data.measure import DiscreteMeasure
 from collections.abc import Callable, Iterator
 import jax
 import jax.numpy as jnp
@@ -77,7 +77,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
     borders:
         Tuple (b0, b1) defining the (shared) domain bounds on each axis.
     cost_fn:
-        Callable cost function c(x, y) used by TwoMarginalProblem.
+        Callable cost function c(x, y) used by TwoMarginalProblem. Defaults to
+        squared Euclidean distance.
     use_jax:
         If True, use JAX sampling/pdf evaluation; otherwise use NumPy/SciPy.
     seed:
@@ -96,7 +97,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
         These bounds control the typical component scale via covariance re-scaling.
     measure_mode:
         Measure construction mode passed to `_build_measure`:
-        typically 'grid', 'discrete', or 'auto' (project-specific semantics).
+        typically 'grid', 'point_cloud', or 'auto' (project-specific semantics).
     cell_discretization:
         Grid discretization convention: 'cell-centered' or 'vertex-centered'.
         For 'cell-centered', weights are multiplied by cell volume to approximate
@@ -123,7 +124,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike],
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         use_jax: bool = True,
         seed: int = 42,
         wishart_df: int | None = None,
@@ -131,8 +132,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
         mean_from_borders_coef: float = MEAN_FROM_BORDERS_COEF,
         variance_lower_bound_coef: float = VARIANCE_LOWER_BOUND_COEF,
         variance_upper_bound_coef: float = VARIANCE_UPPER_BOUND_COEF,
-        measure_mode: str = "grid",  # NEW: 'grid' | 'discrete' | 'auto'
-        cell_discretization: str = "cell-centered" # NEW: 'cell-centered' | 'vertex-centered'
+        measure_mode: str = "grid",
+        cell_discretization: str = "cell-centered",
     ):
         super().__init__()
         # TODO: arbitrary dim?

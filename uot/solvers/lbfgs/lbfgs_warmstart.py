@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jaxopt import LBFGS, OptStep
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 from uot.utils.solver_helpers import coupling_tensor
@@ -24,7 +24,7 @@ class WarmStartLBFGSTwoMarginalSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -35,7 +35,7 @@ class WarmStartLBFGSTwoMarginalSolver(BaseSolver):
         if len(costs) == 0:
             raise ValueError("Cost matrix not provided.")
 
-        mu, nu = marginals[0].to_discrete()[1], marginals[1].to_discrete()[1]
+        mu, nu = marginals[0].as_point_cloud()[1], marginals[1].as_point_cloud()[1]
         C = costs[0]
 
         # warm start with Sinkhorn to get initial u0, v0

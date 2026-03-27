@@ -1,6 +1,6 @@
 import jax
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 from uot.utils.logging import logger
@@ -18,7 +18,7 @@ class PDLPBarycenterSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         weights: ArrayLike,
         reg: float = 1e-3,
@@ -30,7 +30,7 @@ class PDLPBarycenterSolver(BaseSolver):
 
         couplings, barycenter, us, vs, i_final, final_err = _solve_pdlp_barycenter(
             cost=costs[0],
-            marginals = jnp.asarray([marg.to_discrete()[1] for marg in marginals]),
+            marginals = jnp.asarray([marg.as_point_cloud()[1] for marg in marginals]),
             weights = jnp.asarray(weights),
             epsilon=reg,
             precision=tol,

@@ -68,8 +68,8 @@ class PairedGenerator(ProblemGenerator):
         for _ in range(self._num_datasets):
             mu_problem = next(iter_a)
             nu_problem = next(iter_b)
-            mu, _ = mu_problem.get_marginals()
-            nu, _ = nu_problem.get_marginals()
+            mu, _ = mu_problem.solver_inputs(include_cost=False).marginals
+            nu, _ = nu_problem.solver_inputs(include_cost=False).marginals
 
             yield TwoMarginalProblem(
                 name=self._name,

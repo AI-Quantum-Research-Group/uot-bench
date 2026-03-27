@@ -7,7 +7,7 @@ import cv2
 
 from uot.solvers.sinkhorn import sinkhorn_divergence_with_solver
 
-from uot.data.measure import GridMeasure, DiscreteMeasure
+from uot.data.measure import GridMeasure, PointCloudMeasure
 
 SINKHORN_DIVERGENCE_REG = 5e-4
 SINKHORN_DIVERGENCE_MAXITER = 50000
@@ -17,9 +17,9 @@ SINKHORN_DIVERGENCE_MAX_POINTS = 2000
 
 def _prepare_sparse_measure(measure):
     if isinstance(measure, GridMeasure):
-        points, weights = measure.to_discrete(include_zeros=False)
+        points, weights = measure.as_point_cloud(include_zeros=False)
     else:
-        points, weights = measure.to_discrete()
+        points, weights = measure.as_point_cloud()
 
     points_np = np.asarray(points)
     weights_np = np.asarray(weights, dtype=np.float64)
@@ -37,7 +37,7 @@ def _prepare_sparse_measure(measure):
         weights_np = weights_np[idx]
         weights_np = weights_np / np.sum(weights_np)
 
-    return DiscreteMeasure(points=points_np, weights=weights_np, name=getattr(measure, "name", ""))
+    return PointCloudMeasure(points=points_np, weights=weights_np, name=getattr(measure, "name", ""))
 
 
 def compute_sinhorn_divergence(source_grid: GridMeasure, target_grid: GridMeasure, batch_size: int = 1000, epsilon: float = 0.001) -> float:
@@ -55,8 +55,8 @@ def compute_sinhorn_divergence(source_grid: GridMeasure, target_grid: GridMeasur
 
 
 def compute_kl_divergence(source_grid: GridMeasure, target_grid: GridMeasure) -> float:
-    _, src_weights = source_grid.to_discrete(include_zeros=True)
-    _, tgt_weights = target_grid.to_discrete(include_zeros=True)
+    _, src_weights = source_grid.as_point_cloud(include_zeros=True)
+    _, tgt_weights = target_grid.as_point_cloud(include_zeros=True)
     
     src_weights = src_weights / np.sum(src_weights)
     src_weights = np.clip(src_weights, 1e-12, 1)

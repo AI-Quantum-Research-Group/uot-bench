@@ -81,12 +81,12 @@ def measure_with_gpu_tracker(prob, instance, *args, **kwargs):
         # additinally get some extra metrics for Back-and-Forth solver
         if instance.__class__.__name__ == 'BackNForthSqEuclideanSolver':
             marginals = args[0]
-            axes_mu = marginals[0].for_grid_solver(backend="jax", dtype=jnp.float64)[0]
+            axes_mu = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[0]
             grids = jnp.meshgrid(*axes_mu, indexing="ij")     # list of d arrays, each (*shape)
             X = jnp.stack(grids, axis=-1)
             (mu_nd, nu_nd) = [
-                marginals[0].for_grid_solver(backend="jax", dtype=jnp.float64)[1],
-                marginals[1].for_grid_solver(backend="jax", dtype=jnp.float64)[1],
+                marginals[0].as_grid(backend="jax", dtype=jnp.float64)[1],
+                marginals[1].as_grid(backend="jax", dtype=jnp.float64)[1],
             ]
             extra = instance._extra_metrics(
                 mu_nd=mu_nd,

@@ -13,7 +13,7 @@ class MyGenerator(ProblemGenerator):
 ```
 
 Most generators discretize a continuous distribution on a Cartesian grid and
-then build either a `GridMeasure` or a `DiscreteMeasure` via
+then build either a `GridMeasure` or a `PointCloudMeasure` via
 `uot.utils.build_measure._build_measure`.
 
 ## Common parameters and behavior
@@ -24,10 +24,10 @@ Many generators share these parameters:
 - `n_points`: number of grid points per axis
 - `num_datasets`: number of problems to yield
 - `borders`: tuple `(low, high)` defining the hyper-rectangle domain
-- `cost_fn`: cost function used by `TwoMarginalProblem`
-- `measure_mode`: `'grid' | 'discrete' | 'auto'`
+- `cost_fn`: optional cost function used by `TwoMarginalProblem` (defaults to squared Euclidean)
+- `measure_mode`: `'grid' | 'point_cloud' | 'auto'`
   - `'grid'`/`'auto'` produce a `GridMeasure` (weights reshaped to ND)
-  - `'discrete'` produces a `DiscreteMeasure` (points, weights)
+  - `'point_cloud'` produces a `PointCloudMeasure` (points, weights)
 - `cell_discretization`: `'cell-centered' | 'vertex-centered'`
   - if `cell-centered`, weights are multiplied by the grid cell volume before
     normalization (Riemann-sum style)
@@ -50,9 +50,10 @@ gen = GaussianMixtureGenerator(
     seed=0,
 )
 
-problem = next(gen.generate())
-mu, nu = problem.get_marginals()
-C = problem.get_costs()[0]
+problem = gen.one()
+inputs = problem.solver_inputs()
+mu, nu = inputs.marginals
+C = inputs.costs[0]
 ```
 
 ## Using generators in notebooks
@@ -79,10 +80,12 @@ gen = ToyBarycenterGenerator(
 
 problem = one_problem(gen, num_marginals=3)
 measures, lambdas, cost, weights = barycenter_inputs(problem)
+point_cloud = problem.point_cloud_inputs()
 ```
 
 `one_problem(...)` pulls a single item from any `ProblemGenerator`.
-`barycenter_inputs(...)` extracts the inputs needed by barycenter solvers.
+`generator.point_cloud_inputs(...)` and `generator.grid_inputs(...)` provide direct one-call access to notebook-ready arrays.
+`barycenter_inputs(...)` is a thin wrapper over the new problem input views.
 `stack_measure_weights(...)` turns a list of measures into a `(M, N)` weight array.
 
 ## Using generators via YAML configs

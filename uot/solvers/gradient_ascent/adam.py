@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 
@@ -40,7 +40,7 @@ class AdamGradientAscentSolver(BaseSolver):
     # ------------------------------------------------------------------
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float,
         maxiter: int,
@@ -49,8 +49,8 @@ class AdamGradientAscentSolver(BaseSolver):
         normalize_cost: bool = True,
         **kwargs,
     ) -> dict:
-        a = marginals[0].to_discrete()[1]
-        b = marginals[1].to_discrete()[1]
+        a = marginals[0].as_point_cloud()[1]
+        b = marginals[1].as_point_cloud()[1]
         cost_original = costs[0]
         scaling = jnp.max(jnp.abs(cost_original)) if normalize_cost else 1.0
         C_norm = cost_original / scaling if normalize_cost else cost_original
@@ -80,7 +80,7 @@ class AdamGradientAscentSolver(BaseSolver):
     # ------------------------------------------------------------------
     @staticmethod
     def find_lr(
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float,
         *args,
@@ -89,8 +89,8 @@ class AdamGradientAscentSolver(BaseSolver):
         max_lr: float = 10.0,
         **kwargs,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
-        a = marginals[0].to_discrete()[1]
-        b = marginals[1].to_discrete()[1]
+        a = marginals[0].as_point_cloud()[1]
+        b = marginals[1].as_point_cloud()[1]
         C = costs[0]
 
         a = jnp.clip(a / jnp.sum(a), a_min=1e-10)

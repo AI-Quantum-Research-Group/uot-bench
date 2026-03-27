@@ -54,10 +54,15 @@ class Experiment:
     ) -> pd.DataFrame:
         results = []
         for i, problem in enumerate(problems):
-            marginals = problem.get_marginals()
-            costs: list[ArrayLike] = problem.get_costs() if use_cost_matrix else []
+            solver_inputs = problem.solver_inputs(include_cost=use_cost_matrix)
+            marginals = solver_inputs.marginals
+            costs: list[ArrayLike] = solver_inputs.costs
             try:
                 solver_init_kwargs = solver_kwargs or {}
+                if getattr(solver, "requires_squared_euclidean", False) and not solver_inputs.is_squared_euclidean:
+                    raise ValueError(
+                        f"{solver.__name__} requires squared Euclidean cost, got {solver_inputs.cost_name}"
+                    )
                 if "learning_rate" in solver_init_kwargs and solver_init_kwargs["learning_rate"] == "auto":
                     logger.info(f"Finding learning rate for {solver.__name__} on {problem}")
                     lr = self._run_lr_finder(
@@ -98,8 +103,9 @@ class Experiment:
         return pd.DataFrame(results)
 
     def run_single(self, problem: MarginalProblem, solver: BaseSolver, **solver_kwargs) -> dict:
-        marginals = problem.get_marginals()
-        costs = problem.get_costs()
+        solver_inputs = problem.solver_inputs(include_cost=True)
+        marginals = solver_inputs.marginals
+        costs = solver_inputs.costs
         return self.solve_fn(
             problem,
             solver,

@@ -2,8 +2,8 @@ from collections.abc import Callable, Iterator
 from numpy.random import default_rng
 from uot.problems.problem_generator import ProblemGenerator
 from uot.problems.two_marginal import TwoMarginalProblem
-from uot.data.measure import DiscreteMeasure
 from uot.utils.types import ArrayLike
+from uot.utils.costs import cost_euclid_squared
 from uot.utils.generate_nd_grid import generate_nd_grid, compute_cell_volume
 from uot.utils.generator_helpers import get_cauchy_pdf, get_axes
 from uot.utils.build_measure import _build_measure
@@ -18,11 +18,11 @@ class CauchyGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike],
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         use_jax: bool = False,
         seed: int = 42,
-        measure_mode: str = "grid",  # NEW: 'grid' | 'discrete' | 'auto'
-        cell_discretization: str = "cell-centered" # NEW: 'cell-centered' | 'vertex-centered'
+        measure_mode: str = "grid",
+        cell_discretization: str = "cell-centered",
     ):
         super().__init__()
         # TODO: arbitrary dim?
@@ -70,8 +70,6 @@ class CauchyGenerator(ProblemGenerator):
         for i in range(self._num_datasets):
             mu_weights = _prepare(cauchy_pdfs[2 * i](points))
             nu_weights = _prepare(cauchy_pdfs[2 * i + 1](points))
-            # mu = DiscreteMeasure(points=points, weights=mu_weights)
-            # nu = DiscreteMeasure(points=points, weights=nu_weights)
             mu = _build_measure(points, mu_weights, axes_support, self._measure_mode, self._use_jax)
             nu = _build_measure(points, nu_weights, axes_support, self._measure_mode, self._use_jax)
 

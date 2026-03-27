@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 from jax import numpy as jnp
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import GridMeasure, PointCloudMeasure
 from uot.problems.base_problem import MarginalProblem
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.utils.import_helpers import import_object
@@ -77,23 +77,41 @@ class HDF5ProblemStore:
             del marg_group[child]
 
         for i, m in enumerate(problem.measures):
-            pts, wts = m.to_discrete()
-            chunks = (min(pts.shape[0], 1024), pts.shape[1])
             grp = marg_group.create_group(str(i))
-            grp.create_dataset(
-                "points",
-                data=np.asarray(pts),
-                compression="gzip",
-                compression_opts=4,
-                chunks=chunks,
-            )
-            grp.create_dataset(
-                "weights",
-                data=np.asarray(wts),
-                compression="gzip",
-                compression_opts=4,
-                chunks=(min(wts.shape[0], 1024),),
-            )
+            grp.attrs["measure_kind"] = getattr(m, "kind", "point_cloud")
+            if isinstance(m, GridMeasure):
+                axes_group = grp.create_group("axes")
+                for axis_idx, axis in enumerate(m.axes):
+                    axes_group.create_dataset(
+                        str(axis_idx),
+                        data=np.asarray(axis),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
+                grp.create_dataset(
+                    "weights_nd",
+                    data=np.asarray(m.weights_nd),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=m.weights_nd.shape,
+                )
+            else:
+                pts, wts = m.as_point_cloud()
+                chunks = (min(pts.shape[0], 1024), pts.shape[1])
+                grp.create_dataset(
+                    "points",
+                    data=np.asarray(pts),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=chunks,
+                )
+                grp.create_dataset(
+                    "weights",
+                    data=np.asarray(wts),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=(min(wts.shape[0], 1024),),
+                )
 
         # ------------------ cost ----------------------
         cost_group = base.require_group("cost")
@@ -151,14 +169,24 @@ class HDF5ProblemStore:
         # TODO: refactor this into factory as soon as we introduce
         #       multi-marginal or barycenter
 
-        # reconstruct marginals as DiscreteMeasure
+        # reconstruct marginals as PointCloudMeasure or GridMeasure
         marginals = []
         mg = base["marginals"]
         for i in sorted(mg.keys(), key=int):
             grp = mg[i]
-            pts = jnp.array(grp["points"][...])
-            wts = jnp.array(grp["weights"][...])
-            marginals.append(DiscreteMeasure(pts, wts, name=f"m{i}"))
+            measure_kind = grp.attrs.get("measure_kind", "point_cloud")
+            if measure_kind == "grid":
+                axes_group = grp["axes"]
+                axes = [
+                    jnp.array(axes_group[name][...])
+                    for name in sorted(axes_group.keys(), key=int)
+                ]
+                weights_nd = jnp.array(grp["weights_nd"][...])
+                marginals.append(GridMeasure(axes=axes, weights_nd=weights_nd, name=f"m{i}", normalize=False))
+            else:
+                pts = jnp.array(grp["points"][...])
+                wts = jnp.array(grp["weights"][...])
+                marginals.append(PointCloudMeasure(pts, wts, name=f"m{i}"))
 
         # cost arrays
         cost_group = base["cost"]

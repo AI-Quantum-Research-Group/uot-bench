@@ -2,7 +2,7 @@ import ot
 import numpy as np
 from collections.abc import Sequence
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 
 from uot.utils.types import ArrayLike
@@ -14,7 +14,7 @@ class LinearProgrammingTwoMarginalSolver(BaseSolver):
     
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         numItermax: int = 100_000,
     ) -> dict:
@@ -22,7 +22,7 @@ class LinearProgrammingTwoMarginalSolver(BaseSolver):
             raise ValueError("Cost tensors not defined.")
         if len(marginals) != 2:
             raise ValueError("This linear programming solver accepts only two marginals.")
-        mu, nu = marginals[0].to_discrete()[1], marginals[1].to_discrete()[1]
+        mu, nu = marginals[0].as_point_cloud()[1], marginals[1].as_point_cloud()[1]
 
         mu = np.asarray(mu)
         nu = np.asarray(nu)

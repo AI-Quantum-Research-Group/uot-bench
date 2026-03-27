@@ -24,13 +24,16 @@ class BarycenterProblem(MarginalProblem):
     def lambdas(self) -> ArrayLike:
         return self._lambdas
 
+    def get_lambdas(self) -> ArrayLike:
+        return self._lambdas
+
     def get_marginals(self) -> list[BaseMeasure]:
         return self.measures
 
     def get_costs(self) -> list[ndarray[tuple[Any, ...], dtype[Any]] | Array]:
         if self._C is None:
             mu, *_ = self.measures
-            X, _ = mu.to_discrete()
+            X, _ = mu.as_point_cloud()
             C = self._cost_fn(X, X)  # should return an (n × m) array
             self._C = [C]
         return self._C
@@ -38,24 +41,25 @@ class BarycenterProblem(MarginalProblem):
     def shared_support_inputs(
         self,
         *,
-        mode: str = "union",
+        mode: str = "same",
         include_zeros: bool = True,
         atol: float = 0.0,
         rtol: float = 0.0,
     ) -> tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike]:
-        support, weights = self.weights_on_shared_support(
-            mode=mode,
+        inputs = self.point_cloud_inputs(
+            shared_support=mode,
+            include_cost=True,
             include_zeros=include_zeros,
             atol=atol,
             rtol=rtol,
         )
-        cost = self._cost_fn(support, support)
-        return support, weights, cost, self._lambdas
+        return inputs.support, inputs.weights, inputs.cost, self._lambdas
 
     def to_dict(self) -> dict:
-        marginals_size = self.measures[0].to_discrete()[1].size
+        marginals_size = self.measures[0].as_point_cloud()[1].size
         return {
             "dataset": self.name,
+            "type": "barycenter",
             "marginals_size": marginals_size,
-            "cost": self._cost_fn.__name__,
+            "cost": self.cost_name,
         }

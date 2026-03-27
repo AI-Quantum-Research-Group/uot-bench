@@ -36,12 +36,12 @@ A minimal two-marginal Sinkhorn example:
 ```python
 import numpy as np
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.solvers.sinkhorn import SinkhornTwoMarginalSolver
 from uot.utils.costs import cost_euclid_squared
 
-# Create two 1D discrete measures
+# Create two 1D point-cloud measures
 x = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
 y = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
 
@@ -50,15 +50,16 @@ a = a / a.sum()
 b = np.exp(-((y - 0.7) ** 2) / 0.02).reshape(-1)
 b = b / b.sum()
 
-mu = DiscreteMeasure(x, a, name="mu")
-nu = DiscreteMeasure(y, b, name="nu")
+mu = PointCloudMeasure(x, a, name="mu")
+nu = PointCloudMeasure(y, b, name="nu")
 
 problem = TwoMarginalProblem("toy", mu, nu, cost_euclid_squared)
 solver = SinkhornTwoMarginalSolver()
+inputs = problem.solver_inputs()
 
 result = solver.solve(
-    marginals=problem.get_marginals(),
-    costs=problem.get_costs(),
+    marginals=inputs.marginals,
+    costs=inputs.costs,
     reg=1e-2,
 )
 

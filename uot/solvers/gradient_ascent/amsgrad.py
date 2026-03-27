@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 from uot.solvers.gradient_ascent._make_schedule import _make_schedule
@@ -34,7 +34,7 @@ class AMSGradSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],   # [mu, nu]
+        marginals: Sequence[PointCloudMeasure],   # [mu, nu]
         costs: Sequence[ArrayLike],            # [C]
         reg: float,
         maxiter: int,
@@ -44,8 +44,8 @@ class AMSGradSolver(BaseSolver):
         **kwargs,
     ) -> dict:
         # --- extract & normalize marginals (stable) ---
-        a = jnp.asarray(marginals[0].to_discrete()[1])
-        b = jnp.asarray(marginals[1].to_discrete()[1])
+        a = jnp.asarray(marginals[0].as_point_cloud()[1])
+        b = jnp.asarray(marginals[1].as_point_cloud()[1])
         a = jnp.clip(a / jnp.sum(a), a_min=1e-10)
         b = jnp.clip(b / jnp.sum(b), a_min=1e-10)
 
@@ -190,7 +190,7 @@ def _ga_amsgrad_2d(
 # from jax import lax
 # import optax
 
-# from uot.data.measure import DiscreteMeasure
+# from uot.data.measure import PointCloudMeasure
 # from uot.solvers.base_solver import BaseSolver
 # from uot.utils.types import ArrayLike
 # from uot.solvers.gradient_ascent._make_schedule import _make_schedule
@@ -222,7 +222,7 @@ def _ga_amsgrad_2d(
 
 #     def solve(
 #         self,
-#         marginals: Sequence[DiscreteMeasure],
+#         marginals: Sequence[PointCloudMeasure],
 #         costs: Sequence[ArrayLike],
 #         reg: float,
 #         maxiter: int,

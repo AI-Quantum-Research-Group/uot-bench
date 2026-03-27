@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 
@@ -16,7 +16,7 @@ class SinkhornTwoMarginalSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -49,8 +49,8 @@ class SinkhornTwoMarginalSolver(BaseSolver):
         #     "iterations": i_final,
         #     "error": final_err,
         # }
-        a = mu.to_discrete()[1]
-        b = nu.to_discrete()[1]
+        a = mu.as_point_cloud()[1]
+        b = nu.as_point_cloud()[1]
         u, v, i_final, final_err = _sinkhorn_plain(
             a=a,
             b=b,
@@ -235,4 +235,3 @@ def _compute_error_from_K(
             ]
         )
     )
-

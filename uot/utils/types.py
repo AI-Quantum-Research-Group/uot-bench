@@ -9,4 +9,4 @@ else:
     # At runtime, we only need to know that ArrayLike is at least a numpy.ndarray
     ArrayLike: TypeAlias = np.ndarray
 
-MeasureMode: TypeAlias = Literal['grid', 'discrete']
+MeasureMode: TypeAlias = Literal["grid", "point_cloud", "auto"]

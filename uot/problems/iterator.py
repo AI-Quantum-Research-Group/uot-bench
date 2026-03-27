@@ -76,4 +76,4 @@ class OnlineProblemIterator(Iterator[MarginalProblem]):
         self._gen_iterator = self._generator.generate()
         # advance it to where we were
         for _ in range(self._idx):
-            next(self._iterator)
+            next(self._gen_iterator)

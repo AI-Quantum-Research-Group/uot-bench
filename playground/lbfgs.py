@@ -11,7 +11,7 @@ from uot.utils.costs import cost_euclid_squared
 from uot.experiments.experiment import Experiment
 from uot.experiments.measurement import measure_with_gpu_tracker
 from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.utils.types import ArrayLike
 from uot.problems.iterator import OnlineProblemIterator
 
@@ -69,7 +69,7 @@ class LBFGSSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -81,8 +81,8 @@ class LBFGSSolver(BaseSolver):
         stepsize: float = 0.0       # if \leq 0 runs a line-search, otherwise takes a fixed step
     ) -> dict:
         mu, nu = (
-            marginals[0].to_discrete()[1],
-            marginals[1].to_discrete()[1],
+            marginals[0].as_point_cloud()[1],
+            marginals[1].as_point_cloud()[1],
         )
 
         try:

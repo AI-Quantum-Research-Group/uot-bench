@@ -17,6 +17,7 @@ from uot.utils.generator_helpers import (
     get_axes,
 )
 from uot.utils.build_measure import _build_measure
+from uot.utils.costs import cost_euclid_squared
 from uot.utils.types import ArrayLike
 
 
@@ -43,7 +44,7 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike],
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         num_components: int = 1,
         num_marginals: int | None = None,
         use_jax: bool = True,

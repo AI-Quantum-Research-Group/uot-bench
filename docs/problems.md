@@ -11,7 +11,7 @@ File: `uot/problems/base_problem.py`
 `MarginalProblem` is the base class for problems with two or more marginals.
 It stores a list of measures and cost functions and provides:
 
-- `get_marginals()` and `get_costs()` (implemented by subclasses)
+- `solver_inputs(...)`, `point_cloud_inputs(...)`, and `grid_inputs(...)`
 - `shared_support(...)` and `weights_on_shared_support(...)` to align measures
 - `key()`/`__hash__()` based on pickled content for reproducible storage
 
@@ -27,8 +27,9 @@ computes and caches the cost matrix and (optionally) the exact optimal transport
 solution via POT (`ot.emd`) for benchmarking.
 
 Key methods:
-- `get_marginals()` returns `[mu, nu]`
-- `get_costs()` returns `[C]` with lazy caching
+- `solver_inputs()` returns marginals, costs, and cost metadata
+- `point_cloud_inputs()` returns aligned support, stacked weights, and optional cost
+- `grid_inputs()` returns shared axes, stacked grid weights, and optional cost
 - `get_exact_cost()` / `get_exact_coupling()` compute ground truth
 
 ### BarycenterProblem
@@ -39,7 +40,7 @@ The cost matrix is computed once from the first marginal's support.
 
 Key methods:
 - `lambdas()` returns weights
-- `shared_support_inputs(...)` returns `(support, weights, cost, lambdas)`
+- `point_cloud_inputs(...)` returns `(support, weights, cost, lambdas)` via a dataclass
 
 ### MultiMarginalProblem
 File: `uot/problems/multi_marginal.py`
@@ -103,13 +104,19 @@ Internally, the serializer resolves:
 
 ## Utility helpers
 
-`MarginalProblem` provides support alignment helpers:
+`MarginalProblem` provides support alignment helpers and high-level input views:
 
-- `shared_support(mode="union"|"intersection"|"first")`
+- `shared_support(mode="same"|"union"|"intersection"|"first")`
 - `weights_on_shared_support(...)`
+- `solver_inputs(include_cost=True)`
+- `point_cloud_inputs(...)`
+- `grid_inputs(...)`
 
-These are particularly useful when combining measures on a common grid or when
-passing data into barycenter solvers.
+`"same"` is the default and should be the common path for notebook and benchmark
+use: it validates that marginals already share a support and then stacks weights
+without constructing a union. Use `"union"` or `"intersection"` explicitly when
+supports genuinely differ. For shared-grid problems, prefer `grid_inputs()`
+because it bypasses point-cloud alignment entirely.
 
 For notebook convenience helpers, see `uot/utils/notebook_helpers.py` and the
 examples in `docs/generators.md`.

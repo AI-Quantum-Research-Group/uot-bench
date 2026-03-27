@@ -46,6 +46,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         "forward_pushforward": cic_pushforward_nd,
         "_forward_pushforward_nd": cic_pushforward_nd,
     }
+    requires_squared_euclidean = True
 
     def __init__(self,
                  pushforward_fn=adaptive_pushforward_nd,
@@ -71,8 +72,8 @@ class BackNForthSqEuclideanSolver(BaseSolver):
             raise ValueError("Back-and-Forth solver accepts only two marginals.")
 
         mu, nu = marginals[0], marginals[1]
-        axes_mu, mu_nd = mu.for_grid_solver(backend="jax", dtype=jnp.float64)
-        axes_nu, nu_nd = nu.for_grid_solver(backend="jax", dtype=jnp.float64)
+        axes_mu, mu_nd = mu.as_grid(backend="jax", dtype=jnp.float64)
+        axes_nu, nu_nd = nu.as_grid(backend="jax", dtype=jnp.float64)
 
         # ----- grid helpers -----
         def _grid_spacings(axes):

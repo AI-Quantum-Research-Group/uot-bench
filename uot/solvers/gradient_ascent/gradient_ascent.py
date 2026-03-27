@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 
@@ -31,7 +31,7 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 50_000,
@@ -42,7 +42,7 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
     ) -> dict:
         # extract weights a_i
         a_list: List[jnp.ndarray] = [
-            jnp.asarray(m.to_discrete(include_zeros=False)[1])
+            jnp.asarray(m.as_point_cloud(include_zeros=False)[1])
             for m in marginals
             ]
         N = len(a_list)
@@ -200,7 +200,7 @@ def _mm_gradient_sgd(
 # import optax
 
 # from uot.utils.types import ArrayLike
-# from uot.data.measure import DiscreteMeasure
+# from uot.data.measure import PointCloudMeasure
 # from uot.solvers.base_solver import BaseSolver
 
 # from uot.utils.solver_helpers import coupling_tensor
@@ -212,7 +212,7 @@ def _mm_gradient_sgd(
 
 #     def solve(
 #         self,
-#         marginals: Sequence[DiscreteMeasure],
+#         marginals: Sequence[PointCloudMeasure],
 #         costs: Sequence[ArrayLike],
 #         reg: float = 1e-3,
 #         maxiter: int = 1000,

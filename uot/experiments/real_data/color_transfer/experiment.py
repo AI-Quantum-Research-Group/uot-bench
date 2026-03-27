@@ -54,9 +54,13 @@ class ColorTransferExperiment(Experiment):
         problem_list = list(problems)
         total = len(problem_list)
         for idx, prob in enumerate(problem_list, start=1):
-            marginals = prob.get_marginals()
-
-            costs = prob.get_costs() if use_cost_matrix else []
+            solver_inputs = prob.solver_inputs(include_cost=use_cost_matrix)
+            marginals = solver_inputs.marginals
+            costs = solver_inputs.costs
+            if getattr(solver, "requires_squared_euclidean", False) and not solver_inputs.is_squared_euclidean:
+                raise ValueError(
+                    f"{solver.__name__} requires squared Euclidean cost, got {solver_inputs.cost_name}"
+                )
             logger.info(
                 "Running experiment %s (%d/%d) on problem: %s",
                 solver.__name__,

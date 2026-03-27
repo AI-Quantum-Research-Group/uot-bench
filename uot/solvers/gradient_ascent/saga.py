@@ -6,7 +6,7 @@ import optax
 from collections.abc import Sequence
 from functools import partial
 from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 
 
 @partial(jax.jit, static_argnums=(0, 5, 6))
@@ -111,7 +111,7 @@ class SAGASolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[jnp.ndarray],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -120,8 +120,8 @@ class SAGASolver(BaseSolver):
         **kwargs,
     ):
         (mu, nu) = (
-            marginals[0].to_discrete(include_zeros=False)[1],
-            marginals[1].to_discrete(include_zeros=False)[1]
+            marginals[0].as_point_cloud(include_zeros=False)[1],
+            marginals[1].as_point_cloud(include_zeros=False)[1]
             )
         C = costs[0]
         key = jax.random.PRNGKey(self._seed)

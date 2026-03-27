@@ -1,6 +1,6 @@
 import jax
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver
 from uot.utils.types import ArrayLike
 
@@ -21,7 +21,7 @@ class PDLPSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -33,8 +33,8 @@ class PDLPSolver(BaseSolver):
             raise ValueError("Cost tensors not defined.")
         # mu, nu = marginals[0], marginals[1]
         mu, nu = (
-            marginals[0].to_discrete(include_zeros=True)[1],
-            marginals[1].to_discrete(include_zeros=True)[1],
+            marginals[0].as_point_cloud(include_zeros=True)[1],
+            marginals[1].as_point_cloud(include_zeros=True)[1],
         )
         coupling, u, v, i_final, final_err = _solve_pdlp(
             a=mu,

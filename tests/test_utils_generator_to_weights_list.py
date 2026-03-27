@@ -1,7 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 
-from uot.data.measure import DiscreteMeasure, GridMeasure
+from uot.data.measure import GridMeasure, PointCloudMeasure
 from uot.problems.problem_generator import ProblemGenerator
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.utils.generator_to_weights_list import (
@@ -20,8 +20,8 @@ class DummyGenerator(ProblemGenerator):
 
 
 def _make_problem(points, weights_mu, weights_nu):
-    mu = DiscreteMeasure(points=points, weights=weights_mu)
-    nu = DiscreteMeasure(points=points, weights=weights_nu)
+    mu = PointCloudMeasure(points=points, weights=weights_mu)
+    nu = PointCloudMeasure(points=points, weights=weights_nu)
     return TwoMarginalProblem(
         name="dummy",
         mu=mu,

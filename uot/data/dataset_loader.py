@@ -1,4 +1,4 @@
-from uot.data.measure import DiscreteMeasure, GridMeasure
+from uot.data.measure import GridMeasure, PointCloudMeasure
 from uot.utils.types import ArrayLike
 from PIL import Image
 import numpy as np
@@ -40,9 +40,13 @@ def convert_color_space_to_rgb(image: np.ndarray, color_space: str) -> np.ndarra
         return lab2rgb(_denormalize_lab(image))
     raise ValueError(f"Unsupported color space: {color_space}")
 
-def load_csv_as_discrete(path: str) -> DiscreteMeasure:
-    "Loads the discrete measure from the defined path to the data."
+def load_csv_as_point_cloud(path: str) -> PointCloudMeasure:
+    "Loads a point-cloud measure from the defined path to the data."
     raise NotImplementedError()
+
+
+def load_csv_as_discrete(path: str) -> PointCloudMeasure:
+    return load_csv_as_point_cloud(path)
 
 
 def load_matrix_as_color_grid(pixels: ArrayLike, num_channels: int, bins_per_channel: int = 32, use_jax: bool = False) -> GridMeasure:

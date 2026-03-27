@@ -83,9 +83,9 @@ def measure_color_transfer_metrics(
     """
     base_metrics = _compute_solution_metrics(solver, marginals, costs, **kwargs)
     solution = base_metrics['solution']
-    axes_mu, mu_nd = marginals[0].for_grid_solver(backend="jax", dtype=jnp.float64)
-    axes_nu, nu_nd = marginals[1].for_grid_solver(backend="jax", dtype=jnp.float64)
-    target_palette, _ = marginals[1].to_discrete()
+    axes_mu, mu_nd = marginals[0].as_grid(backend="jax", dtype=jnp.float64)
+    axes_nu, nu_nd = marginals[1].as_grid(backend="jax", dtype=jnp.float64)
+    target_palette, _ = marginals[1].as_point_cloud()
 
     plan_grid_map = None
     plan_mask = None
@@ -249,11 +249,11 @@ def _compute_map_quality_metrics(
     mu_measure = marginals[0]
     nu_measure = marginals[1]
     if axes_mu is None or mu_nd is None:
-        axes_mu, mu_nd = mu_measure.for_grid_solver(backend="jax", dtype=jnp.float64)
+        axes_mu, mu_nd = mu_measure.as_grid(backend="jax", dtype=jnp.float64)
     if axes_nu is None or nu_nd is None:
-        axes_nu, nu_nd = nu_measure.for_grid_solver(backend="jax", dtype=jnp.float64)
+        axes_nu, nu_nd = nu_measure.as_grid(backend="jax", dtype=jnp.float64)
     if target_palette is None:
-        target_palette, _ = nu_measure.to_discrete()
+        target_palette, _ = nu_measure.as_point_cloud()
 
     map_array = None
     pushforward_mu = None
@@ -426,9 +426,9 @@ def compute_transported_image(
     """
     Compute transported image using either transport plan or Monge map.
     """
-    source_palette = marginals[0].to_discrete()[0]
+    source_palette = marginals[0].as_point_cloud()[0]
     if target_palette is None:
-        target_palette, _ = marginals[1].to_discrete()
+        target_palette, _ = marginals[1].as_point_cloud()
 
     if 'transport_plan' in solution:
         return _transport_image_plan(
@@ -450,7 +450,7 @@ def compute_transported_image(
         mask = None
         if needs_mask:
             if mu_nd is None or axes_mu is None:
-                axes_mu, mu_nd = marginals[0].for_grid_solver(backend="jax", dtype=jnp.float64)
+                axes_mu, mu_nd = marginals[0].as_grid(backend="jax", dtype=jnp.float64)
             mask = np.asarray(mu_nd) > 0
         if use_soft_extension:
             monge_map = _maybe_soft_extend_map(monge_map, mask, True, axes_mu)
@@ -480,7 +480,7 @@ def _transport_image_plan(
     if needs_grid:
         if (grid_map is None) or (mask is None):
             if mu_nd is None or axes_mu is None:
-                axes_mu, mu_nd = mu_measure.for_grid_solver(backend="jax", dtype=jnp.float64)
+                axes_mu, mu_nd = mu_measure.as_grid(backend="jax", dtype=jnp.float64)
             grid_map, mask = _build_plan_grid_map(plan, target_palette, mu_nd)
         if grid_map is not None and mask is not None and axes_mu is not None:
             working_map = grid_map

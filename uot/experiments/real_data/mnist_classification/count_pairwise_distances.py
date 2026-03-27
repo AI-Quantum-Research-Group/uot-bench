@@ -2,7 +2,7 @@ import os
 import jax
 jax.config.update("jax_enable_x64", True)
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.utils.mnist_helpers import load_mnist_data
 from uot.utils.yaml_helpers import load_solvers
 from uot.utils.logging import logger
@@ -37,8 +37,8 @@ def compute_distances_np(X: ArrayLike,
 
     for i, j in args_list:
 
-        nu = DiscreteMeasure(weights=X[i], points=supp)
-        mu = DiscreteMeasure(weights=X[j], points=supp)
+        nu = PointCloudMeasure(weights=X[i], points=supp)
+        mu = PointCloudMeasure(weights=X[j], points=supp)
 
         res = solver_fn([nu, mu], [C], **param_kwargs)
 
@@ -71,8 +71,8 @@ def compute_distances_jax(X: jnp.ndarray,
     pairs = jnp.array([[i, j] for i in range(n) for j in range(i + 1, n)], dtype=jnp.int32)
 
     def solve_single(w1, w2):
-        nu = DiscreteMeasure(weights=w1, points=supp)
-        mu = DiscreteMeasure(weights=w2, points=supp)
+        nu = PointCloudMeasure(weights=w1, points=supp)
+        mu = PointCloudMeasure(weights=w2, points=supp)
         res = solver_fn([nu, mu], [C], **param_kwargs)
         return jnp.sum(res['transport_plan'] * C)
 

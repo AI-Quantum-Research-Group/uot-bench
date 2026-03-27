@@ -5,10 +5,10 @@ from scipy.stats import expon
 
 from uot.utils.generate_nd_grid import generate_nd_grid, compute_cell_volume
 from uot.utils.generator_helpers import get_axes
-from uot.data.measure import DiscreteMeasure
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.problems.problem_generator import ProblemGenerator
 from uot.utils.build_measure import _build_measure
+from uot.utils.costs import cost_euclid_squared
 
 from uot.utils.logging import setup_logger
 
@@ -31,10 +31,10 @@ class IndependentExponentialGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        cost_fn: Callable[[np.ndarray, np.ndarray], np.ndarray] = cost_euclid_squared,
         seed: int = 42,
-        measure_mode: str = "grid",  # NEW: 'grid' | 'discrete' | 'auto'
-        cell_discretization: str = "cell-centered" # NEW: 'cell-centered' | 'vertex-centered'
+        measure_mode: str = "grid",
+        cell_discretization: str = "cell-centered",
     ):
         super().__init__()
         self._name = name
@@ -111,8 +111,6 @@ class IndependentExponentialGenerator(ProblemGenerator):
             if np.any(np.isnan(w_nu)):
                 logger.warning("w_nu contains nan") 
 
-            # mu_measure = DiscreteMeasure(points=points, weights=w_mu)
-            # nu_measure = DiscreteMeasure(points=points, weights=w_nu)
             mu_measure = _build_measure(points, w_mu, axes, self._measure_mode, self._use_jax)
             nu_measure = _build_measure(points, w_nu, axes, self._measure_mode, self._use_jax)
 

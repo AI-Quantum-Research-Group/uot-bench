@@ -186,9 +186,9 @@ def plot_store(store_path: str, outdir: str):
 
     for idx, problem in enumerate(iterator):
         logger.debug(f"Processing problem {problem}")
-        mu, nu = problem.get_marginals()
-        mu_pts, mu_w = mu.to_discrete()
-        nu_pts, nu_w = nu.to_discrete()
+        mu, nu = problem.solver_inputs(include_cost=False).marginals
+        mu_pts, mu_w = mu.as_point_cloud()
+        nu_pts, nu_w = nu.as_point_cloud()
 
         prefix = os.path.join(outdir, f"problem_{idx:04d}")
         logger.debug(f"Output files would have prefix {prefix}")
@@ -217,10 +217,10 @@ def plot_hdf5_dataset(path: str, outdir: str):
         logger.debug(f"Processing problem {problem}")
         prefix = str(out_path / f"problem-{problem.key()}")
         logger.debug(f"The key for {problem} is {problem.key()}")
-        mu, nu = problem.get_marginals()
+        mu, nu = problem.solver_inputs(include_cost=False).marginals
         logger.debug(f"Marginals: [{mu}], [{nu}]")
-        mu_pts, mu_w = mu.to_discrete()
-        nu_pts, nu_w = nu.to_discrete()
+        mu_pts, mu_w = mu.as_point_cloud()
+        nu_pts, nu_w = nu.as_point_cloud()
         if jnp.any(jnp.isnan(mu_w)):
             logger.warning(f"Loaded nan mu weights for {problem}")
         if jnp.any(jnp.isnan(nu_w)):

@@ -6,6 +6,8 @@ from uot.utils.types import ArrayLike
 
 
 class BaseSolver(ABC):
+    requires_squared_euclidean: bool = False
+
     @abstractmethod
     def solve(
         self,

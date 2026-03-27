@@ -4,7 +4,7 @@ from jaxopt import LBFGS
 
 from collections.abc import Sequence
 from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.utils.types import ArrayLike
 
 
@@ -62,7 +62,7 @@ class LBFGSPureSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -75,8 +75,8 @@ class LBFGSPureSolver(BaseSolver):
                                     # takes a fixed step
     ) -> dict:
         mu, nu = (
-            marginals[0].to_discrete()[1],
-            marginals[1].to_discrete()[1],
+            marginals[0].as_point_cloud()[1],
+            marginals[1].as_point_cloud()[1],
         )
 
         u, v, transport_plan, iters, grad_norm = lbfgs(

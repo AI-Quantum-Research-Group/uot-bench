@@ -43,7 +43,7 @@ def _collect_weights(
             raise TypeError(
                 f"Expected TwoMarginalProblem from generator, got {type(problem).__name__}"
             )
-        marginals = problem.get_marginals()
+        marginals = problem.solver_inputs(include_cost=False).marginals
         if num_marginals is None:
             num_marginals = len(marginals)
         elif len(marginals) != num_marginals:
@@ -51,11 +51,11 @@ def _collect_weights(
         if grid_mode:
             grid_weights = []
             for idx, marginal in enumerate(marginals):
-                if not hasattr(marginal, "for_grid_solver"):
+                if not hasattr(marginal, "as_grid"):
                     raise TypeError(
-                        "Grid mode requires marginals to implement for_grid_solver"
+                        "Grid mode requires marginals to implement as_grid"
                     )
-                axes, weights_nd = marginal.for_grid_solver()
+                axes, weights_nd = marginal.as_grid()
                 if support_axes is None:
                     support_axes = axes
                     support = _stack_grid_support(axes)
@@ -68,7 +68,7 @@ def _collect_weights(
             # weights_list.append(tuple(grid_weights))
         else:
             pts_weights = [
-                marginal.to_discrete(include_zeros=include_zeros)
+                marginal.as_point_cloud(include_zeros=include_zeros)
                 for marginal in marginals
             ]
             supports, weights = zip(*pts_weights)
