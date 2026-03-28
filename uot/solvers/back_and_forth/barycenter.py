@@ -49,6 +49,47 @@ def _resolve_monge_map_fn(pushforward_fn: Callable) -> Callable:
     return monge_map_from_psi_nd
 
 
+def _mild_isotropic_blur(field: jnp.ndarray, sigma: float) -> jnp.ndarray:
+    sigma = jnp.asarray(sigma, dtype=field.dtype)
+    sigma = jnp.maximum(sigma, jnp.asarray(0.0, dtype=field.dtype))
+    sigma_sq = jnp.square(sigma)
+    eps = jnp.asarray(jnp.finfo(field.dtype).eps, dtype=field.dtype)
+    neighbor_weight = jnp.where(
+        sigma > 0,
+        jnp.exp(-0.5 / jnp.maximum(sigma_sq, eps)),
+        jnp.asarray(0.0, dtype=field.dtype),
+    )
+    normalizer = jnp.asarray(1.0, dtype=field.dtype) + 2.0 * neighbor_weight
+
+    blurred = field
+    for axis in range(field.ndim):
+        axis_size = field.shape[axis]
+        indices = jnp.arange(axis_size)
+        prev_vals = jnp.take(blurred, jnp.maximum(indices - 1, 0), axis=axis)
+        next_vals = jnp.take(blurred, jnp.minimum(indices + 1, axis_size - 1), axis=axis)
+        blurred = (neighbor_weight * prev_vals + blurred + neighbor_weight * next_vals) / normalizer
+    return blurred
+
+
+def _default_barycenter_init(
+    weights: jnp.ndarray,
+    measures: jnp.ndarray,
+    init_blur_sigma: float,
+    init_floor: float,
+    smooth_default_init: bool,
+) -> jnp.ndarray:
+    weights_reshaped = weights.reshape((weights.shape[0],) + (1,) * (measures.ndim - 1))
+    mu_init = jnp.sum(weights_reshaped * measures, axis=0)
+    if smooth_default_init:
+        mu_init = _mild_isotropic_blur(mu_init, sigma=init_blur_sigma)
+
+    init_floor = jnp.asarray(init_floor, dtype=mu_init.dtype)
+    init_floor = jnp.maximum(init_floor, jnp.asarray(0.0, dtype=mu_init.dtype))
+    mu_init = mu_init + init_floor
+    mu_init = jnp.clip(mu_init, 0.0)
+    return mu_init / jnp.maximum(mu_init.sum(), jnp.finfo(mu_init.dtype).eps)
+
+
 @partial(
     jax.jit,
     static_argnames=(
@@ -57,6 +98,7 @@ def _resolve_monge_map_fn(pushforward_fn: Callable) -> Callable:
         "pushforward_fn",
         "c_transform_fn",
         "transport_error_metric",
+        "smooth_default_init",
         "return_monge_maps",
     ),
 )
@@ -74,6 +116,9 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
     transport_error_metric: str = "h1_psi_relative",
     pushforward_fn: PushforwardFn = cic_pushforward_nd,
     c_transform_fn: CTransformFn = c_transform_quadratic_fast,
+    init_blur_sigma: float = 1.0,
+    init_floor: float = 1e-8,
+    smooth_default_init: bool = True,
     return_monge_maps: bool = False,
 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
     """Compute a Wasserstein barycenter with a JAX-jitted back-and-forth solver.
@@ -97,7 +142,8 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
         ``backnforth_sqeuclidean_nd`` (e.g. tuple/list of coordinate arrays).
     barycenter_init : jnp.ndarray | None, optional
         Optional initialization for the barycenter with shape (*gridshape).
-        If ``None``, the arithmetic mean of ``measures`` is used.
+        If ``None``, a weighted average of ``measures`` is used, optionally
+        mildly smoothed, given a small positive floor, and renormalized.
     outer_maxiter : int, default=15
         Maximum number of outer barycenter iterations.
     stopping_tol : float, default=5e-4
@@ -117,6 +163,15 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
         Pushforward function used to update the barycenter with the aggregated
         PSI potential. Must accept ``(mu, potential)`` and return a tuple
         ``(pushed_density, aux)``.
+    init_blur_sigma : float, default=1.0
+        Smoothing strength for the default initialization when
+        ``barycenter_init`` is ``None``.
+    init_floor : float, default=1e-8
+        Small nonnegative floor added to the default initialization before
+        renormalization.
+    smooth_default_init : bool, default=True
+        Whether to apply mild isotropic smoothing to the weighted default
+        initialization when ``barycenter_init`` is ``None``.
     return_monge_maps : bool, default=False
         If True, compute and return the per-measure Monge maps for the final
         barycenter in the diagnostics dictionary (key ``"monge_maps"``).
@@ -154,7 +209,13 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
 
     # init barycenter
     if barycenter_init is None:
-        barycenter_init = measures.mean(axis=0)  # arithmetic mean across J
+        barycenter_init = _default_barycenter_init(
+            weights=weights,
+            measures=measures,
+            init_blur_sigma=init_blur_sigma,
+            init_floor=init_floor,
+            smooth_default_init=smooth_default_init,
+        )
     mu0 = jnp.clip(barycenter_init, 0.0)
     mu0 = mu0 / jnp.maximum(mu0.sum(), jnp.finfo(mu0.dtype).eps)
 
@@ -276,6 +337,9 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
     transport_error_metric: str = "h1_psi_relative",
     pushforward_fn: PushforwardFn | str = cic_pushforward_nd,
     c_transform_fn: CTransformFn | str = c_transform_quadratic_fast,
+    init_blur_sigma: float = 1.0,
+    init_floor: float = 1e-8,
+    smooth_default_init: bool = True,
     return_monge_maps: bool = False,
 ):
     """Convenience wrapper for the JAX barycenter solver.
@@ -295,6 +359,8 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         Coordinate pytree for the transport solver.
     barycenter_init : jnp.ndarray | None, optional
         Optional initialization for the barycenter with shape (*gridshape).
+        If ``None``, the default is a weighted, mildly smoothed average of the
+        input measures with a small positive floor before renormalization.
     outer_maxiter : int, default=15
         Maximum number of outer iterations.
     stopping_tol : float, default=5e-4
@@ -311,6 +377,15 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         Error metric name forwarded to ``backnforth_sqeuclidean_nd``.
     pushforward_fn : Callable | None, default=cic_pushforward_nd
         Pushforward function used for the barycenter update.
+    init_blur_sigma : float, default=1.0
+        Smoothing strength for the default initialization when
+        ``barycenter_init`` is ``None``.
+    init_floor : float, default=1e-8
+        Small nonnegative floor added to the default initialization before
+        renormalization.
+    smooth_default_init : bool, default=True
+        Whether to apply mild isotropic smoothing to the weighted default
+        initialization when ``barycenter_init`` is ``None``.
     return_monge_maps : bool, default=False
         If True, include per-measure Monge maps in the diagnostics output.
 
@@ -339,6 +414,9 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         transport_error_metric=transport_error_metric,
         pushforward_fn=resolved_pushforward_fn,
         c_transform_fn=resolved_c_transform_fn,
+        init_blur_sigma=init_blur_sigma,
+        init_floor=init_floor,
+        smooth_default_init=smooth_default_init,
         return_monge_maps=return_monge_maps,
     )
     return mu, diag
