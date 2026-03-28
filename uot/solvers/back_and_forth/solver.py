@@ -1,8 +1,7 @@
 from __future__ import annotations
-from collections.abc import Sequence, Callable
+from collections.abc import Sequence
 from typing import Literal, Dict
 
-from jax import lax
 import jax.numpy as jnp
 
 from uot.data.measure import GridMeasure
@@ -13,7 +12,8 @@ from uot.utils.import_helpers import import_object
 
 from uot.utils.metrics.pushforward_map_metrics import extra_grid_metrics
 
-from .method import backnforth_sqeuclidean_nd
+from .c_transform import c_transform_quadratic_fast
+from .method import CTransformFn, ErrorMetric, PushforwardFn, backnforth_sqeuclidean_nd
 from .forward_pushforward import cic_pushforward_nd
 from .pushforward import adaptive_pushforward_nd
 from .monge_map import (
@@ -23,13 +23,6 @@ from .monge_map import (
 )
 
 
-ErrorMetric = Literal[
-    "tv_psi", "tv_phi", "l_inf_psi",
-    "h1_psi", "h1_psi_relative",
-    "transportation_cost", "transportation_cost_relative"
-]
-
-
 class BackNForthSqEuclideanSolver(BaseSolver):
 
     """
@@ -37,7 +30,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
     Marginals must use cell-centered discretization for stability.
     """
 
-    _PUSHFORWARD_ALIASES: Dict[str, Callable] = {
+    _PUSHFORWARD_ALIASES: Dict[str, PushforwardFn] = {
         "adaptive": adaptive_pushforward_nd,
         "adaptive_pushforward_nd": adaptive_pushforward_nd,
         "cic": cic_pushforward_nd,
@@ -46,14 +39,22 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         "forward_pushforward": cic_pushforward_nd,
         "_forward_pushforward_nd": cic_pushforward_nd,
     }
+    _C_TRANSFORM_ALIASES: Dict[str, CTransformFn] = {
+        "quadratic_fast": c_transform_quadratic_fast,
+        "c_transform_quadratic_fast": c_transform_quadratic_fast,
+    }
     requires_squared_euclidean = True
 
     def __init__(self,
-                 pushforward_fn=adaptive_pushforward_nd,
+                 pushforward_fn: PushforwardFn | str = adaptive_pushforward_nd,
+                 c_transform_fn: CTransformFn | str = c_transform_quadratic_fast,
                  ):
         resolved_fn, resolved_name = self._resolve_pushforward_fn(pushforward_fn)
+        resolved_c_transform_fn, resolved_c_transform_name = self._resolve_c_transform_fn(c_transform_fn)
         self._pushforward_fn = resolved_fn
         self._pushforward_fn_name = resolved_name
+        self._c_transform_fn = resolved_c_transform_fn
+        self._c_transform_fn_name = resolved_c_transform_name
         return super().__init__()
 
     def solve(
@@ -104,6 +105,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
             stepsize_lower_bound=stepsize_lower_bound,
             error_metric=error_metric,
             pushforward_fn=self._pushforward_fn,
+            c_transform_fn=self._c_transform_fn,
         )
 
         d = mu_nd.ndim
@@ -155,22 +157,37 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         """
         Accept callables, shorthand aliases or dotted import paths.
         """
-        if callable(pushforward_fn):
-            return pushforward_fn, getattr(pushforward_fn, "__name__", str(pushforward_fn))
+        return cls._resolve_callable(
+            pushforward_fn,
+            aliases=cls._PUSHFORWARD_ALIASES,
+            kind="pushforward_fn",
+        )
 
-        if isinstance(pushforward_fn, str):
-            key = pushforward_fn.lower()
-            if key in cls._PUSHFORWARD_ALIASES:
-                fn = cls._PUSHFORWARD_ALIASES[key]
+    @classmethod
+    def _resolve_c_transform_fn(cls, c_transform_fn):
+        return cls._resolve_callable(
+            c_transform_fn,
+            aliases=cls._C_TRANSFORM_ALIASES,
+            kind="c_transform_fn",
+        )
+
+    @staticmethod
+    def _resolve_callable(value, *, aliases, kind: str):
+        if callable(value):
+            return value, getattr(value, "__name__", str(value))
+
+        if isinstance(value, str):
+            key = value.lower()
+            if key in aliases:
+                fn = aliases[key]
                 return fn, getattr(fn, "__name__", key)
-            fn = import_object(pushforward_fn)
+            fn = import_object(value)
             if callable(fn):
-                return fn, getattr(fn, "__name__", pushforward_fn)
-            raise TypeError(f"Resolved object '{pushforward_fn}' is not callable.")
+                return fn, getattr(fn, "__name__", value)
+            raise TypeError(f"Resolved object '{value}' is not callable.")
 
         raise TypeError(
-            "pushforward_fn must be a callable or an importable string reference, "
-            f"got {type(pushforward_fn)}"
+            f"{kind} must be a callable or an importable string reference, got {type(value)}"
         )
 
     @staticmethod

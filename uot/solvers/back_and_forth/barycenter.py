@@ -1,28 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Optional
-from functools import reduce
-
-import numpy as np
-import jax.numpy as jnp
-
-from uot.data.measure import GridMeasure
-from uot.utils.central_gradient_nd import _central_gradient_nd
-
-from .method import backnforth_sqeuclidean_nd
-
 from functools import partial
-from typing import Callable, Optional, Tuple, Dict, Any
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 
-# --- your project imports (kept as-is) ---
 from uot.utils.central_gradient_nd import _central_gradient_nd
-from .method import backnforth_sqeuclidean_nd
-# from .pushforward import adaptive_pushforward_nd
+
+from .method import CTransformFn, PushforwardFn, backnforth_sqeuclidean_nd
 from .forward_pushforward import cic_pushforward_nd
 from .pushforward import adaptive_pushforward_nd
 from .c_transform import c_transform_quadratic_fast
@@ -31,6 +19,7 @@ from .monge_map import (
     monge_map_cic_from_psi_nd,
     monge_map_adaptive_from_psi_nd,
 )
+from .solver import BackNForthSqEuclideanSolver
 
 
 def _stack_measures(measures_weights):
@@ -66,6 +55,7 @@ def _resolve_monge_map_fn(pushforward_fn: Callable) -> Callable:
         "outer_maxiter",
         "transport_maxiter",
         "pushforward_fn",
+        "c_transform_fn",
         "transport_error_metric",
         "return_monge_maps",
     ),
@@ -82,7 +72,8 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
     transport_maxiter: int = 500,
     transport_tol: float = 1e-3,
     transport_error_metric: str = "h1_psi_relative",
-    pushforward_fn: Optional[Callable] = cic_pushforward_nd,
+    pushforward_fn: PushforwardFn = cic_pushforward_nd,
+    c_transform_fn: CTransformFn = c_transform_quadratic_fast,
     return_monge_maps: bool = False,
 ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
     """Compute a Wasserstein barycenter with a JAX-jitted back-and-forth solver.
@@ -152,8 +143,10 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
       ``transport_error_metric`` are static arguments in the JIT signature.
     """
 
-    if pushforward_fn is None:
-        raise ValueError("pushforward_fn must be provided (e.g. adaptive_pushforward_nd).")
+    if not callable(pushforward_fn):
+        raise TypeError("pushforward_fn must be callable in backnforth_barycenter_sqeuclidean_nd_jax")
+    if not callable(c_transform_fn):
+        raise TypeError("c_transform_fn must be callable in backnforth_barycenter_sqeuclidean_nd_jax")
 
     # normalize weights
     weights = jnp.asarray(weights, dtype=measures.dtype)
@@ -180,6 +173,7 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
             tolerance=transport_tol,
             progressbar=False,
             pushforward_fn=pushforward_fn,
+            c_transform_fn=c_transform_fn,
             error_metric=transport_error_metric,
         )
 
@@ -280,7 +274,8 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
     transport_maxiter: int = 500,
     transport_tol: float = 1e-3,
     transport_error_metric: str = "h1_psi_relative",
-    pushforward_fn: Optional[Callable] = cic_pushforward_nd,
+    pushforward_fn: PushforwardFn | str = cic_pushforward_nd,
+    c_transform_fn: CTransformFn | str = c_transform_quadratic_fast,
     return_monge_maps: bool = False,
 ):
     """Convenience wrapper for the JAX barycenter solver.
@@ -327,6 +322,8 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
     """
     measures = _stack_measures(measures_weights)
     weights = jnp.asarray(weights, dtype=measures.dtype)
+    resolved_pushforward_fn, _ = BackNForthSqEuclideanSolver._resolve_pushforward_fn(pushforward_fn)
+    resolved_c_transform_fn, _ = BackNForthSqEuclideanSolver._resolve_c_transform_fn(c_transform_fn)
 
     mu, diag = backnforth_barycenter_sqeuclidean_nd_jax(
         weights=weights,
@@ -340,7 +337,8 @@ def backnforth_barycenter_sqeuclidean_nd_optimized(
         transport_maxiter=transport_maxiter,
         transport_tol=transport_tol,
         transport_error_metric=transport_error_metric,
-        pushforward_fn=pushforward_fn,
+        pushforward_fn=resolved_pushforward_fn,
+        c_transform_fn=resolved_c_transform_fn,
         return_monge_maps=return_monge_maps,
     )
     return mu, diag
@@ -433,12 +431,13 @@ def solve_barycenter_back_and_forth(
     verbose = bool(params.get("verbose", False))
     cell_volume = params.get("cell_volume")
 
-    c_transform_fn = params.get(
-        "c_transform_fn",
-        partial(c_transform_quadratic_fast, coords_list=coordinates),
+    resolved_c_transform_fn, _ = BackNForthSqEuclideanSolver._resolve_c_transform_fn(
+        params.get("c_transform_fn", c_transform_quadratic_fast)
     )
     two_marginal_solver = params.get("two_marginal_solver", backnforth_sqeuclidean_nd)
-    pushforward_fn = params.get("pushforward_fn", adaptive_pushforward_nd)
+    pushforward_fn, _ = BackNForthSqEuclideanSolver._resolve_pushforward_fn(
+        params.get("pushforward_fn", adaptive_pushforward_nd)
+    )
 
     apply_h1_inverse = params.get("apply_h1_inverse")
     if apply_h1_inverse is None:
@@ -490,10 +489,10 @@ def solve_barycenter_back_and_forth(
 
     for outer_idx in range(num_outer_iters):
         if formulation == "phi":
-            psi_list = [c_transform_fn(phi) for phi in phi_list]
+            psi_list = [resolved_c_transform_fn(phi, coordinates) for phi in phi_list]
         else:
             # Keep the driver interface formulation-aware; psi-variant is left for later.
-            phi_list = [c_transform_fn(psi) for psi in psi_list]
+            phi_list = [resolved_c_transform_fn(psi, coordinates) for psi in psi_list]
             raise NotImplementedError(
                 "psi-formulation is not implemented yet; use params['formulation']='phi'."
             )
@@ -513,6 +512,7 @@ def solve_barycenter_back_and_forth(
                 tolerance=tolerance,
                 progressbar=progressbar,
                 pushforward_fn=pushforward_fn,
+                c_transform_fn=resolved_c_transform_fn,
                 stepsize_lower_bound=stepsize_lower_bound,
                 error_metric=error_metric,
                 **solver_kwargs,

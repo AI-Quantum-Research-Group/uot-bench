@@ -215,32 +215,45 @@
 #     Lam = Lam.at[(0,) * d].set(jnp.inf)
 #     return Lam
 
+from collections.abc import Callable, Sequence
+from typing import Literal
+
 import jax
 from jax import lax
 from jax import numpy as jnp
 from jax.scipy.fft import dctn, idctn
-import numpy as np
 from functools import partial
+
 from .c_transform import c_transform_quadratic_fast
 from .pushforward import adaptive_pushforward_nd
+
+
+PushforwardFn = Callable[[jnp.ndarray, jnp.ndarray], tuple[jnp.ndarray, jnp.ndarray]]
+CTransformFn = Callable[[jnp.ndarray, Sequence[jnp.ndarray]], jnp.ndarray]
+ErrorMetric = Literal[
+    "tv_psi", "tv_phi", "l_inf_psi",
+    "h1_psi", "h1_psi_relative",
+    "transportation_cost", "transportation_cost_relative"
+]
 
 
 
 # ------------------------ main BFM (d-dimensional) ------------------------
 @partial(jax.jit, static_argnames=('maxiterations', 'progressbar',
                                   'stepsize_lower_bound', 'error_metric',
-                                  'pushforward_fn'))
+                                  'pushforward_fn', 'c_transform_fn'))
 def backnforth_sqeuclidean_nd(
         mu: jnp.ndarray,                 # shape (n0,...,nd-1)
         nu: jnp.ndarray,                 # shape (n0,...,nd-1)
-        coordinates: list[jnp.ndarray],  # len d, each length n_k
+        coordinates: Sequence[jnp.ndarray],  # len d, each length n_k
         stepsize: float,
         maxiterations: int,
         tolerance: float,
         progressbar: bool = False,
-        pushforward_fn=adaptive_pushforward_nd,
+        pushforward_fn: PushforwardFn = adaptive_pushforward_nd,
+        c_transform_fn: CTransformFn = c_transform_quadratic_fast,
         stepsize_lower_bound: float = 0.01,
-        error_metric: str = 'h1_psi',
+        error_metric: ErrorMetric = 'h1_psi',
     ):
     """
     Dimension-agnostic BFM with quadratic cost on a uniform tensor grid in [0,1]^d.
@@ -262,8 +275,10 @@ def backnforth_sqeuclidean_nd(
     armijo_lower = 0.25
     armijo_scale_down = 0.95
 
-    # c-transform for quadratic cost (will call your fast implementation)
-    c_transform = partial(c_transform_quadratic_fast, coords_list=coordinates)
+    if not callable(pushforward_fn):
+        raise TypeError("pushforward_fn must be callable in backnforth_sqeuclidean_nd")
+    if not callable(c_transform_fn):
+        raise TypeError("c_transform_fn must be callable in backnforth_sqeuclidean_nd")
 
     # precompute kernel and r^2 grid
     kernel = neumann_kernel_nd(shape, Ls, dtype=mu.dtype)
@@ -347,13 +362,13 @@ def backnforth_sqeuclidean_nd(
 
         rho_mu, _ = pushforward_fn(mu, -psi)
         phi, _, _ = update_potential(phi, rho_mu, nu, sigma)
-        psi = c_transform(phi)
-        phi = c_transform(psi)  # ensure consistency
+        psi = c_transform_fn(phi, coordinates)
+        phi = c_transform_fn(psi, coordinates)  # ensure consistency
 
         rho_nu, _ = pushforward_fn(nu, -phi)
         psi, _, grad_sq_psi = update_potential(psi, rho_nu, mu, sigma)
-        phi = c_transform(psi)
-        psi = c_transform(phi)  # ensure consistency
+        phi = c_transform_fn(psi, coordinates)
+        psi = c_transform_fn(phi, coordinates)  # ensure consistency
 
         dual_curr = dual_value(phi, psi)
         sigma_new = stepsize_update(sigma, dual_curr, dual_prev, grad_sq_psi)
