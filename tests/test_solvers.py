@@ -5,10 +5,10 @@ import jax.numpy as jnp
 from uot.data.measure import GridMeasure
 from uot.experiments.experiment import Experiment
 from uot.problems.two_marginal import TwoMarginalProblem
+import uot.solvers.back_and_forth as back_and_forth_pkg
 from uot.solvers.back_and_forth.barycenter import (
     backnforth_barycenter_sqeuclidean_nd_jax,
     backnforth_barycenter_sqeuclidean_nd_optimized,
-    solve_barycenter_back_and_forth,
 )
 from uot.solvers.back_and_forth.c_transform import c_transform_quadratic_fast
 from uot.solvers.back_and_forth.forward_pushforward import cic_pushforward_nd
@@ -176,83 +176,9 @@ def test_barycenter_optimized_resolves_aliases(monkeypatch):
     assert captured["c_transform_fn"] is c_transform_quadratic_fast
 
 
-def test_legacy_barycenter_uses_direct_two_arg_c_transform():
-    captured = {}
-
-    def custom_c_transform(phi, coords_list):
-        captured["coords"] = coords_list
-        return phi + 5.0
-
-    def fake_pair_solver(**kwargs):
-        phi = jnp.zeros_like(kwargs["mu"])
-        captured["output"] = np.asarray(kwargs["c_transform_fn"](phi, kwargs["coordinates"]))
-        mu = kwargs["mu"]
-        return (
-            jnp.array(1, dtype=jnp.int32),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.ones((1,), dtype=mu.dtype),
-            jnp.ones((1,), dtype=mu.dtype),
-            jnp.ones((1,), dtype=mu.dtype),
-        )
-
-    def identity_pushforward(mu, psi):
-        return mu, psi
-
-    coordinates = [jnp.array([0.25, 0.75])]
-    solve_barycenter_back_and_forth(
-        mu_list=[jnp.array([0.5, 0.5]), jnp.array([0.25, 0.75])],
-        lambda_list=jnp.array([0.5, 0.5]),
-        gamma=1.0,
-        params={
-            "coordinates": coordinates,
-            "num_outer_iters": 1,
-            "two_marginal_solver": fake_pair_solver,
-            "pushforward_fn": identity_pushforward,
-            "c_transform_fn": custom_c_transform,
-        },
-    )
-
-    assert captured["coords"] is coordinates
-    np.testing.assert_allclose(captured["output"], np.array([5.0, 5.0]))
-
-
-def test_legacy_barycenter_resolves_string_c_transform():
-    captured = {}
-
-    def fake_pair_solver(**kwargs):
-        captured["c_transform_fn"] = kwargs["c_transform_fn"]
-        mu = kwargs["mu"]
-        return (
-            jnp.array(1, dtype=jnp.int32),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.zeros_like(mu),
-            jnp.ones((1,), dtype=mu.dtype),
-            jnp.ones((1,), dtype=mu.dtype),
-            jnp.ones((1,), dtype=mu.dtype),
-        )
-
-    def identity_pushforward(mu, psi):
-        return mu, psi
-
-    solve_barycenter_back_and_forth(
-        mu_list=[jnp.array([0.5, 0.5]), jnp.array([0.25, 0.75])],
-        lambda_list=jnp.array([0.5, 0.5]),
-        gamma=1.0,
-        params={
-            "coordinates": [jnp.array([0.25, 0.75])],
-            "num_outer_iters": 1,
-            "two_marginal_solver": fake_pair_solver,
-            "pushforward_fn": identity_pushforward,
-            "c_transform_fn": "quadratic_fast",
-        },
-    )
-
-    assert captured["c_transform_fn"] is c_transform_quadratic_fast
+def test_package_root_does_not_export_legacy_gibbs_barycenter_api():
+    assert not hasattr(back_and_forth_pkg, "build_gibbs_nu")
+    assert not hasattr(back_and_forth_pkg, "solve_barycenter_back_and_forth")
 
 
 def test_experiment_run_on_problems_accepts_c_transform_init_kwarg(monkeypatch):
