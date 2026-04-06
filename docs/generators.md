@@ -157,8 +157,12 @@ File: `uot/problems/generators/gaussian_mixture_generator.py`
 File: `uot/problems/generators/gaussian_mixture_barycenter_generator.py`
 
 - Barycenter problems with N Gaussian/GMM marginals on a shared grid.
+- Supports arbitrary positive ambient dimension in the generator path.
 - Uses the same sampling backends as `GaussianMixtureGenerator`.
 - Set `num_components=1` for single-Gaussian marginals.
+- In practice, 4D is intended for generator and grid-measure workflows; dense
+  cost materialization scales as `(n_points^dim)^2` and is not part of this
+  generator-level support.
 
 Example (Python):
 

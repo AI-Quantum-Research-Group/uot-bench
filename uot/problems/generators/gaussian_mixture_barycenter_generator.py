@@ -30,7 +30,7 @@ VARIANCE_UPPER_BOUND_COEF = 0.01
 class GaussianMixtureBarycenterGenerator(ProblemGenerator):
     """
     Generate barycenter problems with N Gaussian (or Gaussian-mixture) marginals
-    discretized on a shared Cartesian grid.
+    discretized on a shared Cartesian grid in arbitrary positive dimension.
 
     The sampling and discretization logic mirrors GaussianMixtureGenerator:
     mixture parameters are sampled per marginal, the pdf is evaluated on a grid,
@@ -60,10 +60,25 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
         analytic_mode: Literal["auto", "1d", "commuting", "two_marginal"] = "auto",
     ) -> None:
         super().__init__()
-        if dim not in [1, 2, 3]:
-            raise ValueError("dim must be 1, 2 or 3")
+        if dim < 1:
+            raise ValueError("dim must be >= 1")
         if num_components < 1:
             raise ValueError("num_components must be >= 1")
+        resolved_wishart_df = wishart_df if wishart_df is not None else dim + 1
+        if resolved_wishart_df <= dim - 1:
+            raise ValueError(
+                "wishart_df must be > dim - 1 "
+                f"(got {resolved_wishart_df} for dim={dim})"
+            )
+        resolved_wishart_scale = (
+            np.asarray(wishart_scale)
+            if wishart_scale is not None
+            else np.eye(dim)
+        )
+        if resolved_wishart_scale.shape != (dim, dim):
+            raise ValueError(
+                f"wishart_scale must have shape {(dim, dim)}, got {resolved_wishart_scale.shape}"
+            )
         self._name = name
         self._dim = dim
         self._num_components = num_components
@@ -77,9 +92,8 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
         self._mean_from_borders_coef = mean_from_borders_coef
         self._variance_lower_bound_coef = variance_lower_bound_coef
         self._variance_upper_bound_coef = variance_upper_bound_coef
-        self._wishart_df = wishart_df if wishart_df is not None else dim + 1
-        self._wishart_scale = wishart_scale if wishart_scale is not None else np.eye(
-            dim)
+        self._wishart_df = resolved_wishart_df
+        self._wishart_scale = resolved_wishart_scale
         self.cell_discretization = cell_discretization
         self._analytic_when_possible = analytic_when_possible
         self._analytic_mode = analytic_mode
