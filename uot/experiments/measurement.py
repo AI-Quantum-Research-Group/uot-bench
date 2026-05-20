@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping, Sequence
-from typing import Any, NotRequired, Required, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NotRequired, Required, TypedDict, cast
 
 import jax
 
-from gpu_tracker.tracker import Tracker
+if TYPE_CHECKING:
+    from gpu_tracker.tracker import Tracker
 
 from uot.data.measure import BaseMeasure
 from uot.problems.base_problem import Problem
@@ -113,7 +114,7 @@ def measure_solution_precision(
     if not isinstance(prob, HasExactCost):
         raise TypeError(f"{type(prob).__name__} does not implement get_exact_cost()")
     exact = prob.get_exact_cost()
-    return {"cost_rerr": abs(exact - result["cost"]) / exact}
+    return {"cost_rerr": float(abs(exact - result["cost"]) / exact)}
 
 
 def measure_with_gpu_tracker(
@@ -125,8 +126,9 @@ def measure_with_gpu_tracker(
 ) -> MeasurementGPU:
     """Run *instance* inside a GPU/CPU resource tracker and return detailed metrics."""
     import jax.numpy as jnp
+    from gpu_tracker.tracker import Tracker as _Tracker  # type: ignore[import-untyped]
 
-    with Tracker(
+    with _Tracker(
         sleep_time=0.1,
         gpu_ram_unit="megabytes",
         time_unit="seconds",
@@ -156,6 +158,7 @@ def measure_with_gpu_tracker(
         metrics.pop("u_final", None)
         metrics.pop("v_final", None)
 
+    assert gt.resource_usage is not None, "Tracker did not record resource usage"
     usage = gt.resource_usage
     peak_gpu_ram = usage.max_gpu_ram
     gpu_utilization = usage.gpu_utilization

@@ -9,6 +9,8 @@ from uot.problems.two_marginal import TwoMarginalProblem
 from uot.problems.problem_generator import ProblemGenerator
 from uot.utils.build_measure import _build_measure
 from uot.utils.costs import cost_euclid_squared
+from uot.utils.types import ArrayLike
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 
 MEAN_FROM_BORDERS_COEF = 0.9
 VAR_LOWER = 0.05
@@ -28,10 +30,10 @@ class IndependentCauchyGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[np.ndarray, np.ndarray], np.ndarray] = cost_euclid_squared,
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         seed: int = 42,
         measure_mode: str = "grid",
-        cell_discretization: str = "cell-centered",
+        cell_discretization: CellDiscretization = "cell-centered",
     ):
         super().__init__()
         self._name = name
@@ -43,7 +45,7 @@ class IndependentCauchyGenerator(ProblemGenerator):
         self._rng = np.random.default_rng(seed)
         self._measure_mode = measure_mode
         self._use_jax = False
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
 
     def generate(self) -> Iterator[TwoMarginalProblem]:
         # build the evaluation grid once
@@ -76,7 +78,7 @@ class IndependentCauchyGenerator(ProblemGenerator):
             locs_mu = self._rng.uniform(mean_bounds[0], mean_bounds[1], size=self._dim)
             scales_mu = self._rng.uniform(scale_bounds[0], scale_bounds[1], size=self._dim)
             pdf_mu = np.prod([
-                cauchy(loc=locs_mu[i], scale=scales_mu[i]).pdf(points[:, i])
+                cauchy(loc=locs_mu[i], scale=scales_mu[i]).pdf(points[:, i])  # type: ignore[attr-defined]
                 for i in range(self._dim)
             ], axis=0)
             w_mu = _prepare(pdf_mu)
@@ -85,7 +87,7 @@ class IndependentCauchyGenerator(ProblemGenerator):
             locs_nu = self._rng.uniform(mean_bounds[0], mean_bounds[1], size=self._dim)
             scales_nu = self._rng.uniform(scale_bounds[0], scale_bounds[1], size=self._dim)
             pdf_nu = np.prod([
-                cauchy(loc=locs_nu[i], scale=scales_nu[i]).pdf(points[:, i])
+                cauchy(loc=locs_nu[i], scale=scales_nu[i]).pdf(points[:, i])  # type: ignore[attr-defined]
                 for i in range(self._dim)
             ], axis=0)
             w_nu = _prepare(pdf_nu)

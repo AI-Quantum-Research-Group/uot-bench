@@ -5,6 +5,7 @@ import pickle
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +14,7 @@ import numpy as np
 from uot.data.measure import (
     BaseMeasure,
     GridMeasure,
+    PreparedAlignmentSupport,
     _align_weights_prepared,
     _prepare_alignment_support,
     _row_view,
@@ -124,7 +126,7 @@ class Problem(ABC):
         self.cost_fns = cost_fns
         self._cost_cache = [None] * len(cost_fns)
         self._shared_support_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
-        self._prepared_support_cache: dict[tuple[str, bool, float, float], object] = {}
+        self._prepared_support_cache: dict[tuple[str, bool, float, float], PreparedAlignmentSupport] = {}
         self._aligned_weights_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
         self.__hash = None
 
@@ -275,7 +277,7 @@ class Problem(ABC):
         include_cost: bool = False,
         backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
     ) -> GridInputs:
         marginals = self.get_marginals()
         if not marginals:
@@ -283,22 +285,23 @@ class Problem(ABC):
         if not all(isinstance(m, GridMeasure) for m in marginals):
             raise TypeError("grid_inputs requires all marginals to be GridMeasure instances.")
 
-        reference = marginals[0]
-        for marginal in marginals[1:]:
+        grid_marginals = cast(list[GridMeasure], marginals)
+        reference = grid_marginals[0]
+        for marginal in grid_marginals[1:]:
             reference.check_compatible(marginal)
 
         axes, weights0 = reference.as_grid(
             backend=backend,
             dtype=dtype,
-            device=device,
+            device=device,  # type: ignore[arg-type]
         )
         xp = jnp if any(isinstance(ax, jax.Array) for ax in axes) or isinstance(weights0, jax.Array) else np
         weights = [weights0]
-        for marginal in marginals[1:]:
+        for marginal in grid_marginals[1:]:
             _, weight_nd = marginal.as_grid(
                 backend=backend,
                 dtype=dtype,
-                device=device,
+                device=device,  # type: ignore[arg-type]
             )
             weights.append(weight_nd)
 
@@ -358,8 +361,8 @@ class Problem(ABC):
 
         if mode == "same":
             if include_zeros and all(isinstance(m, GridMeasure) for m in marginals):
-                reference = first
-                for marginal in marginals[1:]:
+                reference = cast(GridMeasure, first)
+                for marginal in cast(list[GridMeasure], marginals)[1:]:
                     try:
                         reference.check_compatible(marginal, atol=atol, rtol=rtol)
                     except ValueError as exc:
@@ -443,12 +446,13 @@ class Problem(ABC):
 
         if mode == "same":
             if include_zeros and all(isinstance(m, GridMeasure) for m in marginals):
-                reference = first
-                _, first_weights = reference.as_grid()
+                grid_marginals_same = cast(list[GridMeasure], marginals)
+                reference_same = grid_marginals_same[0]
+                _, first_weights = reference_same.as_grid()
                 direct_weights = [first_weights.reshape(-1)]
-                for marginal in marginals[1:]:
+                for marginal in grid_marginals_same[1:]:
                     try:
-                        reference.check_compatible(marginal, atol=atol, rtol=rtol)
+                        reference_same.check_compatible(marginal, atol=atol, rtol=rtol)
                     except ValueError as exc:
                         raise self._shared_support_error() from exc
                     _, other_weights = marginal.as_grid()
@@ -469,12 +473,13 @@ class Problem(ABC):
         if mode == "first" and include_zeros and all(
             isinstance(m, GridMeasure) for m in marginals
         ):
-            reference = first
+            grid_marginals_first = cast(list[GridMeasure], marginals)
+            reference_first = grid_marginals_first[0]
             direct_weights = []
             compatible = True
-            for marginal in marginals:
+            for marginal in grid_marginals_first:
                 try:
-                    reference.check_compatible(marginal, atol=atol, rtol=rtol)
+                    reference_first.check_compatible(marginal, atol=atol, rtol=rtol)
                 except ValueError:
                     compatible = False
                     break

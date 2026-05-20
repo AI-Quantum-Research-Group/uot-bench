@@ -135,7 +135,7 @@ def _compute_error(
     b: jax.Array,
     cost: jax.Array,
     epsilon: float,
-) -> float:
+) -> jax.Array:
     P = coupling_tensor(u, v, cost, epsilon)
     row_marginal, col_marginal = tensor_marginals(P)
     return jnp.max(
@@ -224,7 +224,7 @@ def _compute_error_from_K(
     a: jax.Array,
     b: jax.Array,
     K: jax.Array,
-) -> float:
+) -> jax.Array:
     P = (u[:, None] * K) * v[None, :]
     row_marginal, col_marginal = tensor_marginals(P)
     return jnp.max(

@@ -146,10 +146,10 @@ def _gradient(
 
         # ---- apply *schedule* -----------------------------------------
         step_lr = schedule(i)                     # i is the current iteration
-        phi, psi = optax.apply_updates((phi, psi), jax.tree.map(lambda u: u * step_lr, updates))
+        phi, psi = optax.apply_updates((phi, psi), jax.tree.map(lambda u: u * step_lr, updates))  # type: ignore[misc]
 
         # ---- error ----------------------------------------------------
-        log_P = (phi[:, None] + psi[None, :] - C) / eps
+        log_P = (phi[:, None] + psi[None, :] - C) / eps  # type: ignore[operator]
         P = jnp.exp(log_P)
         err = jnp.maximum(jnp.max(jnp.abs(P.sum(1) - a)),
                           jnp.max(jnp.abs(P.sum(0) - b)))
@@ -159,9 +159,9 @@ def _gradient(
         cond, body, (i0, phi0, psi0, opt_state, err0)
     )
 
-    plan = jnp.exp((phi_f[:, None] + psi_f[None, :] - C) / eps)
+    plan = jnp.exp((phi_f[:, None] + psi_f[None, :] - C) / eps)  # type: ignore[operator]
     cost = jnp.sum(plan * C)
-    return plan, cost, phi_f, psi_f, i_final, final_err
+    return plan, cost, phi_f, psi_f, i_final, final_err  # type: ignore[return-value]
 
 
 # ----------------------------------------------------------------------
@@ -208,7 +208,7 @@ def _lr_finder(
 
         grads = (-grad_phi, -grad_psi)
         updates, opt_state = optimizer.update(grads, opt_state, (phi, psi))
-        phi, psi = optax.apply_updates((phi, psi), jax.tree.map(lambda u: u * cur_lr, updates))
+        phi, psi = optax.apply_updates((phi, psi), jax.tree.map(lambda u: u * cur_lr, updates))  # type: ignore[misc]
 
         loss = -compute_dual(phi, psi)
         return (phi, psi, opt_state), loss

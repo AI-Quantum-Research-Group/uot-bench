@@ -29,10 +29,10 @@ class LBFGSTwoMarginalSolver(BaseSolver):
             raise ValueError("Cost tensors not defined.")
         mu, nu = marginals[0].as_point_cloud()[1], marginals[1].as_point_cloud()[1]
 
-        marginals = jnp.array([mu, nu])
+        marginals_arr = jnp.array([mu, nu])
 
         result = lbfgs_multimarginal(
-            marginals=marginals,
+            marginals=marginals_arr,
             C=costs[0],
             epsilon=reg,
             maxiter=maxiter,

@@ -50,12 +50,12 @@ def _resolve_monge_map_fn(pushforward_fn: Callable) -> Callable:
 
 
 def _mild_isotropic_blur(field: jnp.ndarray, sigma: float) -> jnp.ndarray:
-    sigma = jnp.asarray(sigma, dtype=field.dtype)
-    sigma = jnp.maximum(sigma, jnp.asarray(0.0, dtype=field.dtype))
-    sigma_sq = jnp.square(sigma)
+    sigma_arr = jnp.asarray(sigma, dtype=field.dtype)
+    sigma_arr = jnp.maximum(sigma_arr, jnp.asarray(0.0, dtype=field.dtype))
+    sigma_sq = jnp.square(sigma_arr)
     eps = jnp.asarray(jnp.finfo(field.dtype).eps, dtype=field.dtype)
     neighbor_weight = jnp.where(
-        sigma > 0,
+        sigma_arr > 0,
         jnp.exp(-0.5 / jnp.maximum(sigma_sq, eps)),
         jnp.asarray(0.0, dtype=field.dtype),
     )
@@ -83,9 +83,9 @@ def _default_barycenter_init(
     if smooth_default_init:
         mu_init = _mild_isotropic_blur(mu_init, sigma=init_blur_sigma)
 
-    init_floor = jnp.asarray(init_floor, dtype=mu_init.dtype)
-    init_floor = jnp.maximum(init_floor, jnp.asarray(0.0, dtype=mu_init.dtype))
-    mu_init = mu_init + init_floor
+    floor_arr = jnp.asarray(init_floor, dtype=mu_init.dtype)
+    floor_arr = jnp.maximum(floor_arr, jnp.asarray(0.0, dtype=mu_init.dtype))
+    mu_init = mu_init + floor_arr
     mu_init = jnp.clip(mu_init, 0.0)
     return mu_init / jnp.maximum(mu_init.sum(), jnp.finfo(mu_init.dtype).eps)
 
@@ -220,8 +220,8 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
     mu0 = mu0 / jnp.maximum(mu0.sum(), jnp.finfo(mu0.dtype).eps)
 
     # relaxation in (0,1]
-    relaxation = jnp.asarray(relaxation, dtype=mu0.dtype)
-    relaxation = jnp.clip(relaxation, jnp.asarray(1e-12, mu0.dtype), jnp.asarray(1.0, mu0.dtype))
+    relaxation_arr = jnp.asarray(relaxation, dtype=mu0.dtype)
+    relaxation_arr = jnp.clip(relaxation_arr, jnp.asarray(1e-12, mu0.dtype), jnp.asarray(1.0, mu0.dtype))
 
     # --- per-pair solve: (mu, nu) -> (phi, psi, rho_mu, l1_err, l2_err)
     def _pair_solve(mu, nu):
@@ -290,7 +290,7 @@ def backnforth_barycenter_sqeuclidean_nd_jax(
 
         # pushforward uses PSI (unchanged)
         pushed_density, _ = pushforward_fn(mu, -psi_accum)
-        mu_new = (1.0 - relaxation) * mu + relaxation * pushed_density
+        mu_new = (1.0 - relaxation_arr) * mu + relaxation_arr * pushed_density
         mu_new = jnp.clip(mu_new, 0.0)
         mu_new = mu_new / jnp.maximum(mu_new.sum(), jnp.finfo(mu_new.dtype).eps)
 

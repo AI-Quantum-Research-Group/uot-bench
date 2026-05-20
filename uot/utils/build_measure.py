@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import numpy as np
 from jax import numpy as jnp
@@ -36,4 +37,4 @@ def _build_measure(
 
     # 'grid' or 'auto' -> emit GridMeasure
     weights_nd = weights.reshape(shape)  # sampler already evaluated on the grid ordering
-    return GridMeasure(axes=axes, weights_nd=weights_nd, name="", normalize=False)
+    return GridMeasure(axes=cast(list[ArrayLike], list(axes)), weights_nd=weights_nd, name="", normalize=False)

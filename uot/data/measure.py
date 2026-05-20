@@ -317,7 +317,7 @@ class GridMeasure(BaseMeasure):
         *,
         backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
         normalize: bool = False,
     ) -> tuple[list[ArrayLike], ArrayLike]:
         want_jax = (backend == "jax") or (
@@ -350,7 +350,7 @@ class GridMeasure(BaseMeasure):
         *,
         backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
         normalize: bool = False,
     ) -> tuple[list[ArrayLike], ArrayLike]:
         return self.as_grid(

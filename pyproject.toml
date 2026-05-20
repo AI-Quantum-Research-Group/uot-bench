@@ -161,6 +161,10 @@ ignore = ["I001", "E402"]
 
 [tool.pyright]
 include = ["uot"]
+exclude = [
+    "uot/algorithms",
+    "uot/solvers/pdlp_bary",
+]
 typeCheckingMode = "standard"
 pythonVersion = "3.11"
 reportMissingTypeStubs = "warning"

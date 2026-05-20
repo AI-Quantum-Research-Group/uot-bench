@@ -54,6 +54,7 @@ class AMSGradSolver(BaseSolver):
             raise ValueError(f"Cost shape {C.shape} incompatible with marginals {(a.shape[0], b.shape[0])}.")
 
         # --- optional cost normalization ---
+        scaling: jax.Array = jnp.ones(())
         if normalize_cost:
             scaling = jnp.max(jnp.abs(C))
             scaling = jnp.where(scaling > 0, scaling, 1.0)
@@ -150,18 +151,12 @@ def _ga_amsgrad_2d(
         updates = jax.tree.map(lambda g: g * step_lr, updates)
 
         # update potentials
-        u, v = optax.apply_updates((u, v), updates)
-
-        # gauge centering (mean-zero sum across both potentials)
-        # mu, mv = jnp.mean(u), jnp.mean(v)
-        # mbar = 0.5 * (mu + mv)
-        # u = u - (mu - mbar)
-        # v = v - (mv - mbar)
+        u, v = optax.apply_updates((u, v), updates)  # type: ignore[misc]
 
         # recompute residual with updated (u, v)
-        log_K2 = (u[:, None] + v[None, :] - C) / eps
-        row_err = jnp.linalg.norm(jnp.exp(_logsumexp(log_K2, axis=1)) - a, ord=2)
-        col_err = jnp.linalg.norm(jnp.exp(_logsumexp(log_K2, axis=0)) - b, ord=2)
+        log_K2 = (u[:, None] + v[None, :] - C) / eps  # type: ignore[operator]
+        row_err = jnp.linalg.norm(jnp.exp(_logsumexp(jnp.asarray(log_K2), axis=1)) - a, ord=2)
+        col_err = jnp.linalg.norm(jnp.exp(_logsumexp(jnp.asarray(log_K2), axis=0)) - b, ord=2)
         err = jnp.maximum(row_err, col_err)
 
         return (i + 1, u, v, opt_state, err)
@@ -171,7 +166,7 @@ def _ga_amsgrad_2d(
     )
 
     # final plan & cost
-    log_K_final = (u_fin[:, None] + v_fin[None, :] - C) / eps
+    log_K_final = (u_fin[:, None] + v_fin[None, :] - C) / eps  # type: ignore[operator]
     P_final = jnp.exp(log_K_final)
     cost = jnp.sum(P_final * C)
 

@@ -63,7 +63,7 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
             learning_rate=lr, momentum=mom, nesterov=nes,
         )
 
-        return {
+        return {  # type: ignore[return-value]
             "transport_plan": plan,      # shape (n1,...,nN)
             "cost": cost,                # scalar
             "potentials": potentials,    # tuple(u1,...,uN)
@@ -105,7 +105,7 @@ def _marginal_sums_from_potentials(
     us: tuple[jax.Array, ...],
     C: jax.Array,
     eps: float,
-) -> Tuple[tuple[jax.Array, ...], jax.Array]:
+) -> tuple[tuple[jax.Array, ...], jax.Array]:
     """
     Compute marginal sums m_i[x_i] = sum_{x_{-i}} exp((sum_k u_k[x_k] - C)/eps)
     using stable log-sum-exp; also return log_K for possible reuse.
@@ -169,10 +169,10 @@ def _mm_gradient_sgd(
 
         # Optax does DESCENT; negate grads for ASCENT
         updates, opt_state = optimizer.update(tuple(-g for g in grads), opt_state, us)
-        us = optax.apply_updates(us, updates)
+        us = optax.apply_updates(us, updates)  # type: ignore[assignment]
 
         # gauge centering (zero-sum across marginals)
-        us = _center_gauge_multi(us)
+        us = _center_gauge_multi(us)  # type: ignore[arg-type]
 
         # residual for updated potentials
         marg_sums_new, _ = _marginal_sums_from_potentials(us, C, eps)

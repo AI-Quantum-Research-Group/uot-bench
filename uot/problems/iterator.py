@@ -58,7 +58,7 @@ class OnlineProblemIterator(Iterator[MarginalProblem]):
         prob = next(self._gen_iterator)
         if self._cache_gt:
             prob.get_costs()
-            prob.get_exact_cost()
+            prob.get_exact_cost()  # type: ignore[attr-defined]
         logger.info(f"Generated problem {prob}")
         return prob
 

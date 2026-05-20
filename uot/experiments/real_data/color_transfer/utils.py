@@ -4,6 +4,7 @@ import numpy as np
 from jax import numpy as jnp
 import cv2
 import PIL
+import PIL.Image
 import pandas as pd
 from pandas import DataFrame
 

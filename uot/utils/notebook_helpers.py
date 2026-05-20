@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 import jax.numpy as jnp
 
 from uot.data.measure import BaseMeasure, GridMeasure
 from uot.problems.barycenter_problem import BarycenterProblem
 from uot.problems.problem_generator import ProblemGenerator
+from uot.utils.types import ShareMode
 
 
 def one_problem(generator: ProblemGenerator) -> Any:
@@ -44,7 +45,7 @@ def barycenter_inputs(
     measures = problem.solver_inputs(include_cost=False).marginals
     if support_mode == "shared":
         inputs = problem.point_cloud_inputs(
-            shared_support=shared_mode,
+            shared_support=cast(ShareMode, shared_mode),
             include_cost=True,
             include_zeros=include_zeros,
             atol=atol,

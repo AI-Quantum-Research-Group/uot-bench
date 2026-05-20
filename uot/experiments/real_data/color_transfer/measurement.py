@@ -1,10 +1,12 @@
 import math
 import time
 import gc
-from typing import Dict, Union, Tuple
+from typing import Any, Dict, Union, Tuple
 
 import numpy as np
 from jax import numpy as jnp
+
+from uot.data.measure import BaseMeasure, GridMeasure
 
 from uot.experiments.measurement import _wait_jax_finish
 from uot.utils.instantiate_solver import instantiate_solver
@@ -62,7 +64,7 @@ def _build_postprocess_modes(soft_modes, displacement_alphas):
 def measure_color_transfer_metrics(
     prob,
     solver,
-    marginals: Tuple[ArrayLike, ArrayLike],
+    marginals: Tuple[GridMeasure, GridMeasure],
     costs: Tuple[ArrayLike, ...],
     soft_extension_modes: list[bool] | None = None,
     displacement_alphas: list[float] | None = None,
@@ -201,8 +203,8 @@ def _process_transported_image(
         plan_grid_map=plan_grid_map,
         plan_mask=plan_mask,
     )
-    _wait_jax_finish(transported_image)
-    return jnp.clip(jnp.asarray(transported_image), 0, 1)
+    _wait_jax_finish(transported_image)  # type: ignore[arg-type]
+    return jnp.clip(jnp.asarray(transported_image), 0, 1)  # type: ignore[return-value]
 
 
 def _compute_distribution_metrics(transported_image: np.ndarray, target_measure) -> Dict:
@@ -229,7 +231,7 @@ def _compute_distribution_metrics(transported_image: np.ndarray, target_measure)
 
 
 def _compute_map_quality_metrics(
-    marginals: Tuple[ArrayLike, ArrayLike],
+    marginals: Tuple[GridMeasure, GridMeasure],
     solution: Dict,
     *,
     axes_mu=None,
@@ -353,7 +355,7 @@ def _compute_map_quality_metrics(
     )
 
     metrics = {}
-    if map_metrics is not None and pushforward_metrics is not None:
+    if map_metrics is not None and pushforward_metrics is not None and mu_nd_metrics is not None and nu_nd_metrics is not None and axes_mu_metrics is not None:
         X_metrics = _grid_coordinates(axes_mu_metrics)
         grid_metrics = extra_grid_metrics(
             mu_nd=mu_nd_metrics,
@@ -410,7 +412,7 @@ def _compute_image_quality_metrics(
 
 def compute_transported_image(
     prob,
-    marginals: Tuple[ArrayLike, ArrayLike],
+    marginals: Tuple[GridMeasure, GridMeasure],
     solution: Dict,
     *,
     axes_mu=None,
@@ -463,9 +465,9 @@ def compute_transported_image(
 def _transport_image_plan(
     plan: jnp.ndarray,
     image: jnp.ndarray,
-    source_palette: jnp.ndarray,
-    target_palette: jnp.ndarray,
-    mu_measure=None,
+    source_palette: ArrayLike,
+    target_palette: ArrayLike,
+    mu_measure: GridMeasure | None = None,
     mu_nd=None,
     axes_mu=None,
     use_soft_extension: bool = False,
@@ -480,6 +482,7 @@ def _transport_image_plan(
     if needs_grid:
         if (grid_map is None) or (mask is None):
             if mu_nd is None or axes_mu is None:
+                assert mu_measure is not None, "mu_measure must be provided when mu_nd/axes_mu are None"
                 axes_mu, mu_nd = mu_measure.as_grid(backend="jax", dtype=jnp.float64)
             grid_map, mask = _build_plan_grid_map(plan, target_palette, mu_nd)
         if grid_map is not None and mask is not None and axes_mu is not None:

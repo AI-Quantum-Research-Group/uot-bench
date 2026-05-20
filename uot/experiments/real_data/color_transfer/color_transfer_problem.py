@@ -49,53 +49,53 @@ class ColorTransferProblem(TwoMarginalProblem):
         self._target_rgb = None
 
     @property
-    def source_image(self) -> jnp.ndarray:
+    def source_image(self) -> jnp.ndarray | None:
         if self._source_image is None:
             if self._source_data is None:
                 return None
             if hasattr(self._source_data, "get_image"):
-                self._source_image = self._source_data.get_image()
+                self._source_image = self._source_data.get_image()  # type: ignore[attr-defined]
             elif callable(self._source_data):
                 self._source_image = self._source_data()
             else:
                 self._source_image = self._source_data
-        return self._source_image
+        return self._source_image  # type: ignore[return-value]
 
     @property
-    def target_image(self) -> jnp.ndarray:
+    def target_image(self) -> jnp.ndarray | None:
         if self._target_image is None:
             if self._target_data is None:
                 return None
             if hasattr(self._target_data, "get_image"):
-                self._target_image = self._target_data.get_image()
+                self._target_image = self._target_data.get_image()  # type: ignore[attr-defined]
             elif callable(self._target_data):
                 self._target_image = self._target_data()
             else:
                 self._target_image = self._target_data
-        return self._target_image
+        return self._target_image  # type: ignore[return-value]
 
     @property
     def source_full(self):
         if self._source_full is None and hasattr(self._source_data, "get_color_image"):
-            self._source_full = self._source_data.get_color_image()
+            self._source_full = self._source_data.get_color_image()  # type: ignore[attr-defined]
         return self._source_full
 
     @property
     def target_full(self):
         if self._target_full is None and hasattr(self._target_data, "get_color_image"):
-            self._target_full = self._target_data.get_color_image()
+            self._target_full = self._target_data.get_color_image()  # type: ignore[attr-defined]
         return self._target_full
 
     @property
     def source_rgb(self):
         if self._source_rgb is None and hasattr(self._source_data, "get_rgb_image"):
-            self._source_rgb = self._source_data.get_rgb_image()
+            self._source_rgb = self._source_data.get_rgb_image()  # type: ignore[attr-defined]
         return self._source_rgb
 
     @property
     def target_rgb(self):
         if self._target_rgb is None and hasattr(self._target_data, "get_rgb_image"):
-            self._target_rgb = self._target_data.get_rgb_image()
+            self._target_rgb = self._target_data.get_rgb_image()  # type: ignore[attr-defined]
         return self._target_rgb
 
     def to_rgb_image(self, active_image):
@@ -106,7 +106,7 @@ class ColorTransferProblem(TwoMarginalProblem):
                 base = np.array(self.source_full, copy=True)
                 base[..., self.active_channels] = np.asarray(active_image)
                 full = base
-            return self._source_data.color_to_rgb(full)
+            return self._source_data.color_to_rgb(full)  # type: ignore[attr-defined]
         return active_image
 
     def to_dict(self):
@@ -131,6 +131,6 @@ class ColorTransferProblem(TwoMarginalProblem):
         self._source_rgb = None
         self._target_rgb = None
         if hasattr(self._source_data, "free_memory"):
-            self._source_data.free_memory(keep_grid=True, keep_image=False)
+            self._source_data.free_memory(keep_grid=True, keep_image=False)  # type: ignore[attr-defined]
         if hasattr(self._target_data, "free_memory"):
-            self._target_data.free_memory(keep_grid=True, keep_image=False)
+            self._target_data.free_memory(keep_grid=True, keep_image=False)  # type: ignore[attr-defined]

@@ -55,7 +55,8 @@ class Experiment:
     ) -> float:
         if not hasattr(solver, "find_lr"):
             raise RuntimeError(f"Solver {solver.__class__.__name__} has no `find_lr` method")
-        lrs, losses = solver.find_lr(marginals=marginals, costs=costs, **solver_kwargs)
+        _solver_any: Any = solver
+        lrs, losses = _solver_any.find_lr(marginals=marginals, costs=costs, **solver_kwargs)
         return float(lrs[jnp.argmax(jnp.array(losses))])
 
     def run_on_problems(
@@ -71,6 +72,8 @@ class Experiment:
             solver_inputs = problem.solver_inputs(include_cost=use_cost_matrix)
             marginals = solver_inputs.marginals
             costs: list[ArrayLike] = solver_inputs.costs
+            solver_init_kwargs: dict[str, Any] = {}
+            metrics: dict[str, Any] = {}
             try:
                 solver_init_kwargs = solver_kwargs or {}
                 if getattr(solver, "requires_squared_euclidean", False) and not solver_inputs.is_squared_euclidean:
@@ -88,7 +91,7 @@ class Experiment:
                     solver_init_kwargs["learning_rate"] = lr
                     logger.info(f"Found learning rate: {lr:.3e}")
 
-                instance = instantiate_solver(solver_cls=solver, init_kwargs=solver_init_kwargs)
+                instance = instantiate_solver(solver_cls=solver, init_kwargs=solver_init_kwargs)  # type: ignore[arg-type]
 
                 logger.info(f"Starting {solver.__name__} with {solver_kwargs} on {problem}")
                 metrics = self.solve_fn(

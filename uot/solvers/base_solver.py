@@ -25,9 +25,15 @@ class SolverOutput(TypedDict):
     # Potentials (dual variables)
     u_final: NotRequired[jax.Array]
     v_final: NotRequired[jax.Array]
-    potentials: NotRequired[tuple[jax.Array, jax.Array]]
+    potentials: NotRequired[tuple[jax.Array, ...]]
     # Monge map / push-forward
     monge_map: NotRequired[jax.Array]
+    # Barycenter / multi-marginal extras
+    residual_l2: NotRequired[float | jax.Array]
+    transport_plans: NotRequired[jax.Array]
+    barycenter: NotRequired[jax.Array]
+    us_final: NotRequired[jax.Array]
+    vs_final: NotRequired[jax.Array]
     # Extra solver-specific fields — solvers may add more keys
     time: NotRequired[float]
 

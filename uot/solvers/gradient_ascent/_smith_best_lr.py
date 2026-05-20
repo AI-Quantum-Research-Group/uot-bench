@@ -6,7 +6,7 @@ def best_lr(
     window: int = 5,
     factor: float = 10.0,
     smooth: bool = True,
-) -> float:
+):
     """
     Pick the “best” learning-rate from an LR-finder run.
 

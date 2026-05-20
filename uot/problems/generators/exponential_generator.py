@@ -9,6 +9,7 @@ from uot.utils.types import ArrayLike
 from uot.utils.generate_nd_grid import generate_nd_grid, compute_cell_volume
 from uot.utils.generator_helpers import get_exponential_pdf, get_axes
 from uot.utils.build_measure import _build_measure
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 
 
 class ExponentialGenerator(ProblemGenerator):
@@ -24,7 +25,7 @@ class ExponentialGenerator(ProblemGenerator):
         use_jax: bool = False,
         seed: int = 42,
         measure_mode: str = "grid",
-        cell_discretization: str = "cell-centered",
+        cell_discretization: CellDiscretization = "cell-centered",
     ):
         if dim != 1:
             raise ValueError("For exponential distribution dim must be 1")
@@ -38,7 +39,7 @@ class ExponentialGenerator(ProblemGenerator):
         self._use_jax = use_jax
         self._rng = default_rng(seed)
         self._measure_mode = measure_mode
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
 
     def generate(self) -> Iterator[TwoMarginalProblem]:
         pdfs_num = 2 * self._num_datasets

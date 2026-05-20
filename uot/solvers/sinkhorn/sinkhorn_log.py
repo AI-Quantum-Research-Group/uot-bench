@@ -31,7 +31,7 @@ class SinkhornTwoMarginalLogJaxSolver(BaseSolver):
         cost_original = costs[0]
         cost_scale = jnp.max(jnp.abs(cost_original))
         C = cost_original / cost_scale if normalize_cost else cost_original
-        reg = reg / cost_scale if normalize_cost else reg
+        reg = float(reg / cost_scale) if normalize_cost else reg
         mu, nu = marginals[0].as_point_cloud()[1], marginals[1].as_point_cloud()[1]
 
         P, cost, phi, psi, n_steps, err = sinkhorn_jax(

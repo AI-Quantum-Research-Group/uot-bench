@@ -1,3 +1,4 @@
+from typing import cast
 import numpy as np
 from uot.utils.types import ArrayLike
 from uot.problems.problem_generator import ProblemGenerator
@@ -12,6 +13,7 @@ from uot.utils.generator_helpers import (
 from uot.utils.build_measure import _build_measure
 from uot.utils.costs import cost_euclid_squared
 from uot.utils.generator_helpers import get_axes
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 from uot.problems.two_marginal import TwoMarginalProblem
 from collections.abc import Callable, Iterator
 import jax
@@ -133,7 +135,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
         variance_lower_bound_coef: float = VARIANCE_LOWER_BOUND_COEF,
         variance_upper_bound_coef: float = VARIANCE_UPPER_BOUND_COEF,
         measure_mode: str = "grid",
-        cell_discretization: str = "cell-centered",
+        cell_discretization: CellDiscretization = "cell-centered",
     ):
         super().__init__()
         # TODO: arbitrary dim?
@@ -160,7 +162,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
             self._key = jax.random.PRNGKey(seed)
         else:
             self._rng = np.random.default_rng(seed)
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
 
     def _sample_weights_jax(
         self,
@@ -181,7 +183,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
             )
             weights = jnp.ones((self._num_components,)) / self._num_components
             pdf = build_gmm_pdf(means, covs, weights)
-            w = pdf(self._points)
+            w = pdf(jnp.asarray(self._points))
             return w / jnp.sum(w), (means, covs, weights)
 
         pdf, self._key = get_gmm_pdf_jax(
@@ -191,7 +193,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
             mean_bounds=mean_bounds,
             variance_bounds=variance_bounds,
         )
-        w = pdf(self._points)
+        w = pdf(jnp.asarray(self._points))
         return w / jnp.sum(w)
 
     def _rescale_covariances(
@@ -397,8 +399,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
         )
 
         for _ in range(self._num_datasets):
-            w_mu = sampler(mean_bounds, variance_bounds)
-            w_nu = sampler(mean_bounds, variance_bounds)
+            w_mu = cast(jnp.ndarray, sampler(mean_bounds, variance_bounds))
+            w_nu = cast(jnp.ndarray, sampler(mean_bounds, variance_bounds))
 
             if self.cell_discretization == "cell-centered":
                 w_mu = w_mu * cell_volume

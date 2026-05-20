@@ -16,7 +16,7 @@ from sklearn.metrics import accuracy_score
 import argparse
 
 
-def get_solver_files(solvers: list[SolverConfig], costs_dir: str)-> list[str]:
+def get_solver_files(solvers: list[SolverConfig], costs_dir: str) -> list[tuple[SolverConfig, dict, str]]:
     """
     Extract solver file names from the list of SolverConfig objects.
     """
@@ -58,10 +58,10 @@ def load_pairwise_distances(solvers: list[SolverConfig], costs_dir: str)-> dict:
     return pairwise_distances
 
 
-def create_kernel_matrix(distance_matrix: np.ndarray)-> np.ndarray:
+def create_kernel_matrix(distance_matrix: ArrayLike) -> np.ndarray:
     """Convert distance matrix to a proper kernel matrix"""
 
-    kernel_matrix = np.exp(-distance_matrix)
+    kernel_matrix = np.exp(-np.asarray(distance_matrix))
     return kernel_matrix
 
 
@@ -91,7 +91,7 @@ def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: 
         fold_score = accuracy_score(y_test, y_pred)
         scores.append(fold_score)
     
-    return np.mean(scores)
+    return float(np.mean(scores))
 
 
 def main() -> None:

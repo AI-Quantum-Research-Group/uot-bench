@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, cast
 
 import jax.numpy as jnp
 
@@ -72,7 +72,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         if len(marginals) != 2:
             raise ValueError("Back-and-Forth solver accepts only two marginals.")
 
-        mu, nu = marginals[0], marginals[1]
+        mu, nu = cast(GridMeasure, marginals[0]), cast(GridMeasure, marginals[1])
         axes_mu, mu_nd = mu.as_grid(backend="jax", dtype=jnp.float64)
         axes_nu, nu_nd = nu.as_grid(backend="jax", dtype=jnp.float64)
 
@@ -140,16 +140,16 @@ class BackNForthSqEuclideanSolver(BaseSolver):
 
 
         # ----- assemble result -----
-        out = {
+        out: SolverOutput = {
             "monge_map": monge_map,
             "cost": cost,
             "u_final": phi,
             "v_final": psi,
             "iterations": iters,
             "error": errors[iters - 1],
-            "marginal_error_L2": jnp.linalg.norm((rho_mu - nu_nd).ravel()),
-            "pushforward_fn_name": self._pushforward_fn_name,
         }
+        out["pushforward_fn_name"] = self._pushforward_fn_name  # type: ignore[typeddict-unknown-key]
+        out["marginal_error_L2"] = jnp.linalg.norm((rho_mu - nu_nd).ravel())  # type: ignore[typeddict-unknown-key]
         return out
 
     @classmethod
@@ -221,7 +221,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         T,
     ) -> dict[str, float]:
         psi_arr = jnp.asarray(psi).reshape(mu_nd.shape)
-        pushforward_mu, _ = self._pushforward_fn(mu_nd, psi_arr)
+        pushforward_mu, _ = self._pushforward_fn(mu_nd, psi_arr)  # type: ignore[misc]
         T_phys = self._monge_map_index_to_physical(T, axes_mu)
         metrics = extra_grid_metrics(
             mu_nd=mu_nd,

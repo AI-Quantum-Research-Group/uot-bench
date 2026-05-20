@@ -21,7 +21,7 @@ def get_problem_iterators(
     if dataset:
         if dataset.endswith(".h5"):
             store = HDF5ProblemStore(dataset)
-            return [ProblemIterator(store)]
+            return [ProblemIterator(store)]  # type: ignore[arg-type]
         return load_problems_from_dir(dataset)
     return load_problems(config=config)
 

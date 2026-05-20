@@ -32,7 +32,7 @@ class LinearProgrammingTwoMarginalSolver(BaseSolver):
             "cost": jnp.asarray(log["cost"]),
             "u_final": jnp.asarray(log["u"]),
             "v_final": jnp.asarray(log["v"]),
-            "iterations": log.get("numIter", None),
+            "iterations": int(log.get("numIter", 0)),
             "error": float(
                 max(
                     np.max(np.abs(coupling.sum(axis=1) - mu_np)),

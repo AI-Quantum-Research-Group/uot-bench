@@ -13,14 +13,14 @@ GAUSSIAN_MEAN_PRECISION = 4
 GAUSSIAN_VARIANCE_PRECISION = 4
 DEFAULT_JITTER = 1e-6
 
-PRNGKey = jax.random.PRNGKey
+PRNGKey = jax.Array  # type alias for PRNG keys (jax.Array in modern JAX)
 
 
 def generate_random_covariance(
     key: PRNGKey,
     dim: int,
-    diag_linspace: jnp.ndarray = None,
-    offdiag_linspace: jnp.ndarray = None,
+    diag_linspace: jnp.ndarray | None = None,
+    offdiag_linspace: jnp.ndarray | None = None,
 ) -> tuple[PRNGKey, jnp.ndarray]:
     """
     JAX-only: generate a random SPD covariance in R^dim.
@@ -118,7 +118,7 @@ def generate_gmm_coefficients(
 def build_gmm_pdf(
     means: jnp.ndarray,
     covs: jnp.ndarray,
-    weights: jnp.ndarray = None
+    weights: jnp.ndarray | None = None,
 ) -> Callable[[jnp.ndarray], jnp.ndarray]:
     """
     Pure-JAX GMM PDF builder, returning jitted function.

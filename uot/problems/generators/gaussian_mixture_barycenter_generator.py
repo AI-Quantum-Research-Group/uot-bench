@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 from collections.abc import Callable, Iterator
-from typing import Literal
+from typing import Literal, cast
 
 from uot.problems.barycenter_problem import BarycenterProblem
 from uot.problems.problem_generator import ProblemGenerator
@@ -19,6 +19,7 @@ from uot.utils.generator_helpers import (
 from uot.utils.build_measure import _build_measure
 from uot.utils.costs import cost_euclid_squared
 from uot.utils.types import ArrayLike
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 
 
 # Keep defaults consistent with GaussianMixtureGenerator.
@@ -55,7 +56,7 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
         variance_lower_bound_coef: float = VARIANCE_LOWER_BOUND_COEF,
         variance_upper_bound_coef: float = VARIANCE_UPPER_BOUND_COEF,
         measure_mode: str = "grid",
-        cell_discretization: str = "cell-centered",
+        cell_discretization: CellDiscretization = "cell-centered",
         analytic_when_possible: bool = True,
         analytic_mode: Literal["auto", "1d", "commuting", "two_marginal"] = "auto",
     ) -> None:
@@ -94,9 +95,9 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
         self._variance_upper_bound_coef = variance_upper_bound_coef
         self._wishart_df = resolved_wishart_df
         self._wishart_scale = resolved_wishart_scale
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
         self._analytic_when_possible = analytic_when_possible
-        self._analytic_mode = analytic_mode
+        self._analytic_mode: Literal["auto", "1d", "commuting", "two_marginal"] = analytic_mode
         if self._use_jax:
             self._key = jax.random.PRNGKey(seed)
         else:
@@ -118,7 +119,7 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
             )
             weights = jnp.ones((self._num_components,)) / self._num_components
             pdf = build_gmm_pdf(means, covs, weights)
-            w = pdf(self._points)
+            w = pdf(jnp.asarray(self._points))
             return w / jnp.sum(w), (means, covs, weights)
 
         pdf, self._key = get_gmm_pdf_jax(
@@ -128,7 +129,7 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
             mean_bounds=mean_bounds,
             variance_bounds=variance_bounds,
         )
-        w = pdf(self._points)
+        w = pdf(jnp.asarray(self._points))
         return w / jnp.sum(w)
 
     def _rescale_covariances(
@@ -249,11 +250,15 @@ class GaussianMixtureBarycenterGenerator(ProblemGenerator):
                 )
                 res = sampler(mean_bounds, variance_bounds, return_params=want_params)
                 if want_params:
-                    w, (m_i, cov_i, _alpha) = res
+                    w_raw, (m_i, cov_i, _alpha) = cast(  # type: ignore[misc]
+                        tuple[jnp.ndarray, tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]],
+                        res,
+                    )
+                    w = w_raw
                     sampled_means.append(np.asarray(m_i[0]))
                     sampled_covs.append(np.asarray(cov_i[0]))
                 else:
-                    w = res
+                    w = cast(jnp.ndarray, res)
                 if self.cell_discretization == "cell-centered":
                     w = w * cell_volume
                 w = w / w.sum()
@@ -318,7 +323,7 @@ def _is_commuting_family(
                 1e-15,
             )
             bound = atol + rtol * denom
-            max_comm = max(max_comm, comm_norm)
+            max_comm = max(max_comm, float(comm_norm))
             if comm_norm > bound:
                 return False, max_comm
     return True, max_comm
@@ -327,12 +332,13 @@ def _is_commuting_family(
 def _analytic_barycenter_commuting(
     means: np.ndarray,
     covs: np.ndarray,
-    weights: np.ndarray,
+    weights: ArrayLike,
     *,
     atol: float,
     rtol: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Commuting SPD case: diagonalize once, average sqrt eigenvalues."""
+    weights = np.asarray(weights)
     _, evecs = np.linalg.eigh(covs[0])
     diag_covs = np.einsum("ij,njk,kl->nil", evecs.T, covs, evecs)  # n,d,d
 

@@ -62,7 +62,7 @@ def _solve_pdlp(
     solver = raPDHG(
         verbose=False,
         jit=True,
-        reg=epsilon,
+        reg=epsilon,  # type: ignore[arg-type]
         eps_abs=precision,
         eps_rel=precision,
         iteration_limit=max_iters,
@@ -72,8 +72,10 @@ def _solve_pdlp(
     result, ci = solver.optimize(problem, dim=problem.n)
 
     coupling = result.avg_primal_solution
-    u = result.avg_dual_solution[0]
-    v = result.avg_dual_solution[1]
+    avg_dual = result.avg_dual_solution
+    assert avg_dual is not None, "avg_dual_solution is None"
+    u = avg_dual[0]
+    v = avg_dual[1]
     iters = result.num_iterations
     error = ci.primal_residual_norm
 

@@ -206,13 +206,13 @@ def plot_dataset(dataset_path: str, outdir: str):
         store_output = outpath / store.name
         os.makedirs(store_output, exist_ok=True)
         logger.debug(f"Created store output directory in {store_output}")
-        plot_store(store, store_output)
+        plot_store(str(store), str(store_output))
 
 
 def plot_hdf5_dataset(path: str, outdir: str):
     out_path = Path(outdir)
     store = HDF5ProblemStore(path)
-    iterator = ProblemIterator(store)
+    iterator = ProblemIterator(store)  # type: ignore[arg-type]
     for problem in iterator:
         logger.debug(f"Processing problem {problem}")
         prefix = str(out_path / f"problem-{problem.key()}")

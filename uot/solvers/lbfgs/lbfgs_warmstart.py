@@ -12,7 +12,7 @@ from uot.utils.solver_helpers import coupling_tensor
 
 # Import your existing Sinkhorn initialization function
 # (_sinkhorn or sinkhorn_jax) from uot.solvers.sinkhorn
-from uot.solvers.sinkhorn import _sinkhorn  # or sinkhorn_jax
+from uot.solvers.sinkhorn import _sinkhorn  # type: ignore[attr-defined]  # or sinkhorn_jax
 
 
 class WarmStartLBFGSTwoMarginalSolver(BaseSolver):

@@ -7,6 +7,7 @@ from uot.data.dataset_loader import (
     convert_rgb_to_color_space,
     convert_color_space_to_rgb,
 )
+from typing import Any
 from uot.utils.types import ArrayLike
 
 from uot.utils.logging import logger
@@ -74,7 +75,7 @@ class ImageData:
             self._np_color_image = convert_rgb_to_color_space(rgb, self.color_space)
         return self._np_color_image
     
-    def get_grid(self, use_jax: bool = False) -> ArrayLike:
+    def get_grid(self, use_jax: bool = False) -> Any:
         """Get the color grid of the image, either as numpy or jax array"""
         if use_jax:
             if self._jax_grid is None:

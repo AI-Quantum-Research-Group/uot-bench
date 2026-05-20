@@ -51,6 +51,7 @@ class TwoMarginalProblem(MarginalProblem):
         """
         if self._exact_cost is None:
             self._compute_exact_solution()
+        assert self._exact_cost is not None
         return self._exact_cost
 
     def get_exact_coupling(self) -> ArrayLike:
@@ -60,6 +61,7 @@ class TwoMarginalProblem(MarginalProblem):
         """
         if self._exact_coupling is None:
             self._compute_exact_solution()
+        assert self._exact_coupling is not None
         return self._exact_coupling
 
     def to_dict(self) -> dict:
