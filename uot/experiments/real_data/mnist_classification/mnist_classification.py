@@ -65,7 +65,7 @@ def create_kernel_matrix(distance_matrix: np.ndarray)-> np.ndarray:
     return kernel_matrix
 
 
-def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: ArrayLike, rng_seed: int)-> float:
+def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: ArrayLike, rng_seed: int = 42) -> float:
     """Calculate classification results using proper cross-validation with precomputed kernel"""
     X_sub = X[indices]
     y_sub = y[indices]

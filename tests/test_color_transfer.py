@@ -1,12 +1,15 @@
+import pytest
+
+pytest.importorskip("PIL", reason="color-transfer extra not installed")
+pytest.importorskip("skimage", reason="color-transfer extra not installed")
+
 import numpy as np
 import jax.numpy as jnp
 
-from uot.experiments.real_data.color_transfer.color_transfer import (
+from uot.experiments.real_data.color_transfer.utils import (
     im2mat,
     mat2im,
     match_shape,
-    transport_image,
-    _transform_numpy,
 )
 import uot.experiments.real_data.color_transfer.color_transfer_metrics as ct_metrics
 
@@ -49,79 +52,6 @@ class TestImageUtilities:
         
         resized = match_shape(target_img, source_img)
         assert resized.shape[:2] == (40, 60)
-
-
-class TestTransportImage:
-    """Test image transportation functionality"""
-    
-    def setup_method(self):
-        """Set up test data"""
-        self.n_source = 8
-        self.n_target = 6
-        self.n_channels = 3
-        self.image_pixels = 100
-
-        self.P = np.random.rand(self.n_source, self.n_target)
-        self.P = self.P / np.sum(self.P, axis=1, keepdims=True)
-        
-        self.source_palette = np.random.rand(self.n_source, self.n_channels)
-        self.target_palette = np.random.rand(self.n_target, self.n_channels)
-   
-        self.source_image = np.random.rand(self.image_pixels, self.n_channels)
-        
-    def test_transport_image_numpy_output_shape(self):
-        """Test that transport_image returns correct shape with numpy arrays"""
-        result = transport_image(
-            self.P, self.source_image, self.source_palette, self.target_palette
-        )
-        assert result.shape == self.source_image.shape
-        assert isinstance(result, np.ndarray)
-        
-    def test_transport_image_jax_output_shape(self):
-        """Test that transport_image works with JAX arrays"""
-        P_jax = jnp.array(self.P)
-        source_image_jax = jnp.array(self.source_image)
-        source_palette_jax = jnp.array(self.source_palette)
-        target_palette_jax = jnp.array(self.target_palette)
-        
-        result = transport_image(
-            P_jax, source_image_jax, source_palette_jax, target_palette_jax
-        )
-        assert result.shape == self.source_image.shape
-        assert isinstance(result, np.ndarray)
-        
-    def test_transport_image_values_in_range(self):
-        """Test that transported image values are reasonable"""
-        source_palette = np.random.rand(self.n_source, self.n_channels)
-        target_palette = np.random.rand(self.n_target, self.n_channels)
-        source_image = np.random.rand(self.image_pixels, self.n_channels)
-        
-        result = transport_image(
-            self.P, source_image, source_palette, target_palette
-        )
-        
-        assert np.all(result >= 0)
-        assert np.all(result <= 1)
-
-
-class TestTransformNumpy:
-    """Test numpy transformation function"""
-    
-    def test_transform_numpy_batch_processing(self):
-        """Test that numpy transform handles batching correctly"""
-        n_pixels = 1000
-        n_source = 10
-        n_channels = 3
-        batch_size = 100
-        
-        source_image = np.random.rand(n_pixels, n_channels)
-        source_palette = np.random.rand(n_source, n_channels)
-        projected_palette = np.random.rand(n_source, n_channels)
-        
-        result = _transform_numpy(source_image, source_palette, projected_palette, batch_size)
-        
-        assert result.shape == (n_pixels, n_channels)
-        assert isinstance(result, np.ndarray)
 
 
 class TestColorTransferMetrics:

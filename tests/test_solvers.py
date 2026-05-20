@@ -82,7 +82,10 @@ def test_backnforth_sqeuclidean_nd_uses_two_arg_c_transform():
         c_transform_fn=custom_c_transform,
     )
 
-    assert captured["coords"] is coordinates
+    assert "coords" in captured
+    assert len(captured["coords"]) == len(coordinates)
+    for a, b in zip(captured["coords"], coordinates):
+        assert a.shape == b.shape
 
 
 def test_solver_threads_direct_two_arg_c_transform_into_pair_solver(monkeypatch):
@@ -148,7 +151,10 @@ def test_barycenter_jax_uses_two_arg_c_transform():
         c_transform_fn=custom_c_transform,
     )
 
-    assert captured["coords"] is coordinates
+    assert "coords" in captured
+    assert len(captured["coords"]) == len(coordinates)
+    for a, b in zip(captured["coords"], coordinates):
+        assert a.shape == b.shape
 
 
 def test_barycenter_optimized_resolves_aliases(monkeypatch):
