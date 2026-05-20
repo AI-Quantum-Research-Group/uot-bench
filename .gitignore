@@ -67,6 +67,11 @@ color_transfer_results/
 adobe5k/
 logs/
 outputs/
+eng_char_and_digits_mann/
+color_transfer_data/
+color_transfer_data2/
+color_transfer_data_buf/
+color_transfer_images/
 
 # GPU tracker files
 .gpu-tracker*

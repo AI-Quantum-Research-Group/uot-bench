@@ -22,7 +22,7 @@ def update_cost_error_vs_size_boxplot(solvers, regs, dims, datasets, size):
         rows=1,
         cols=n_solvers,
         subplot_titles=solvers,
-        shared_yaxes=True,
+        # shared_yaxes=True,
         x_title="Problem Size (# points)",
         y_title="Cost RERR",
     )
@@ -49,23 +49,26 @@ def update_cost_error_vs_size_boxplot(solvers, regs, dims, datasets, size):
             row=1,
             col=col_idx,
         )
+        # fig.update_layout(yaxis_type="log", row=1, col=col_idx)
+        fig.update_yaxes(type="log", row=1, col=col_idx)
 
     # enforce categorical axis with the right order
     fig.update_xaxes(
         type='category',
         categoryorder='array',
         categoryarray=ordered_sizes,
-        tickangle=45  # tilt labels if needed
+        # tickangle=45  # tilt labels if needed
     )
 
-    fig.update_layout(yaxis_type="log")
+    # fig.update_layout(yaxis_type="log")
+    
 
     fig.update_layout(
         # title="Cost RERR vs. Problem Size by Solver (Box-Plot)",
         template="plotly_white",
         height=400,
         width=300 * n_solvers,
-        margin=dict(t=60, b=50, l=50, r=50),
+        # margin=dict(t=60, b=50, l=50, r=50),
     )
     fig.update_yaxes(matches="y")
     return fig

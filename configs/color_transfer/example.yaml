@@ -6,12 +6,12 @@ param-grids:
     # - reg: 1
     #   maxiter: 100000
     #   tol: 0.000001
-    # - reg: 0.01
-    #   maxiter: 100000
-    #   tol: 0.000001
-    - reg: !!float 1e-2
+    - reg: !!float 1e-1
       maxiter: 100000
       tol: !!float 1e-6
+    # - reg: !!float 1e-2
+    #   maxiter: 100000
+    #   tol: !!float 1e-6
     # - reg: 0.0001
     #   maxiter: 100000
     #   tol: 0.000001
@@ -43,20 +43,20 @@ param-grids:
   bfm-adaptive:
     - maxiter: 1000
       tol: !!float 1e-6
-      zzerror_metric: "h1_psi_relative"
+      error_metric: "h1_psi_relative"
       stepsize: 1
       stepsize_lower_bound: 0.01
       pushforward_fn: "adaptive"
 
 
 solvers:
-  sinkhorn:
-    solver: uot.solvers.sinkhorn.SinkhornTwoMarginalSolver
-    param-grid: sinkhorn
-    jit: true
-  simplex:
-    solver: uot.solvers.linear_programming.LinearProgrammingTwoMarginalSolver
-    jit: true
+  # sinkhorn:
+  #   solver: uot.solvers.sinkhorn.SinkhornTwoMarginalSolver
+  #   param-grid: sinkhorn
+  #   jit: true
+  # simplex:
+  #   solver: uot.solvers.linear_programming.LinearProgrammingTwoMarginalSolver
+  #   jit: true
   # adam:
   #   solver: uot.solvers.gradient_ascent.AdamGradientAscentSolver
   #   param-grid: adam
@@ -87,12 +87,14 @@ bin-number:
   # - yes
 displacement-interpolation:
   - 0.0
-  - 0.5
+  # - 0.68
   - 1.0
-color-space: rgb
+# color-space: rgb
 # active-channels: [r, g]
+color-space: lab
+active-channels: [a, b]
 batch-size: 100000
-pair-number: 2
+pair-number: 3
 # images-dir: ./adobe5k/rawz
 # images-dir: ./test_images
 images-dir: ./colour_transfer_images

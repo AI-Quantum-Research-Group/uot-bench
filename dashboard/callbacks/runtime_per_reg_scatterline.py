@@ -33,6 +33,8 @@ def update_runtime_vs_reg_median_iqr(solvers, regs, dims, datasets, size, only_c
             title="Runtime vs ε (no numeric runtime/reg after filters)",
             height=480
         ))
+    
+    reg_values = sorted([float(reg) for reg in dff['reg'].unique()])
 
     # 3) Aggregate by (solver, reg): median + IQR (25th–75th), and count
     def q25(s): return s.quantile(0.25, interpolation="linear")
@@ -75,7 +77,7 @@ def update_runtime_vs_reg_median_iqr(solvers, regs, dims, datasets, size, only_c
             mode="lines",
             line=dict(width=0),
             fill="tonexty",
-            opacity=0.10,
+            opacity=0.01,
             # opacity=0.25,
             marker=dict(color=color),
             showlegend=False,
@@ -98,13 +100,20 @@ def update_runtime_vs_reg_median_iqr(solvers, regs, dims, datasets, size, only_c
             ),
             customdata=np.stack([g["solver"], g["y_lo"], g["y_hi"], g["n"]], axis=1),
         ))
+        fig.update_layout(
+            xaxis=dict(
+                tickmode="array",
+                tickvals=reg_values,
+                tickformat=".1e",
+            )
+        )
 
     # 5) Axes & layout
     x_axis_type = "log" if (agg["reg"] > 0).all() else "linear"
     fig.update_xaxes(
         type=x_axis_type,
         ticks="outside",
-        title_text=r"Regularization $\epsilon$ ε (reg)"
+        title_text=r"$\text{Regularization }  \varepsilon \text{ (reg)}$"
     )
     fig.update_yaxes(
         type="log",

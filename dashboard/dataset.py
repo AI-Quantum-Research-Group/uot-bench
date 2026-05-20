@@ -8,6 +8,7 @@ from convergence_thresholds import (
     TOL_BY_SOLVER,
 )
 import logging
+from functools import lru_cache
 
 load_dotenv()
 
@@ -27,7 +28,7 @@ INSTANCE_KEYS = ["distribution", "size", "dim", "reg"]
 SOLVERS_MAP = {
     "gradient": "SGD",
     "sgd": "SGD",
-    "gradient-log": "Adam (log)",
+    "gradient-log": "Adam (Log)",
     "gradient-plain": "Vanilla Grad.",
     "lbfgs": "LBFGS",
     "lp": "Simplex",
@@ -35,13 +36,21 @@ SOLVERS_MAP = {
     "sinkhorn-log": "Log Sinkhorn",
     "sinkhorn-normed": "Sinkhorn (norm. cost)",
     "sinkhorn-normed-log": "Log Sinkhorn (norm. cost)",
-    "back-and-forth": "Back&Forth",
-    "pdlp": "PDLP",
+    "back-and-forth": "Back-and-Forth",
+    "pdlp": "PDHG",     # renamed from PDLP for clarity
+    "back-and-forth-adaptive-stepsize-1": "Back-and-Forth Adaptive (Stepsize 1)",
+    "back-and-forth-adaptive-stepsize-8": "Back-and-Forth Adaptive (Stepsize 8)",
+    "back-and-forth-cic-stepsize-1": "Back-and-Forth CIC (Stepsize 1)",
+    "back-and-forth-cic-stepsize-8": "Back-and-Forth CIC (Stepsize 8)",
 }
 
 LEGEND_ORDER = [
-    "Simplex", "PDLP", "Back&Forth", "Log Sinkhorn (norm. cost)", "Log Sinkhorn",
-    "Sinkhorn (norm. cost)", "Sinkhorn", "LBFGS", "Adam (log)", "SGD", "Vanilla Grad."
+    "Simplex", "PDHG",
+    "Back-and-Forth",
+    "Back-and-Forth Adaptive (Stepsize 1)", "Back-and-Forth Adaptive (Stepsize 8)",
+    "Back-and-Forth CIC (Stepsize 1)", "Back-and-Forth CIC (Stepsize 8)",
+    "Log Sinkhorn (norm. cost)", "Log Sinkhorn",
+    "Sinkhorn (norm. cost)", "Sinkhorn", "LBFGS", "Adam (Log)", "SGD", "Vanilla Grad."
 ]
 
 DISTRIBUTIONS_MAP = {
@@ -65,6 +74,26 @@ DISTRIBUTIONS_MAP = {
     "exp-vs-cauchy": "Exponential to Cauchy",
     "exp-vs-gaussian": "Exponential to Gaussian",
 }
+
+BFM_DIM_DIRS = {
+    1: "1d_grid_bfm",
+    2: "2d_grid_bfm",
+    3: "3d_grid_bfm",
+}
+BFM_PERFORMANCE_COLUMNS = [
+    "iterations",
+    "error",
+    "marginal_error_L2",
+    "runtime",
+    "cost",
+]
+BFM_MONGE_COLUMNS = [
+    "tv_mu_to_nu",
+    "ma_residual_L1",
+    "ma_residual_Linf",
+    "detJ_neg_frac",
+    "phi_is_convex",
+]
 
 
 def load_all_csvs(base_dir: Path, subdirs: list[str]) -> pd.DataFrame:
@@ -292,3 +321,53 @@ def filter_converged(df: pd.DataFrame) -> pd.DataFrame:
 
     # 4) Keep only non-failures
     return good[~failures].reset_index(drop=True)
+
+
+def _parse_dataset_distribution(label: str) -> str:
+    if not isinstance(label, str):
+        return label
+    match = label.split("-")
+    if len(match) < 3:
+        return label
+    raw = "-".join(match[1:-1])
+    return DISTRIBUTIONS_MAP.get(raw, raw)
+
+
+@lru_cache
+def load_bfm_dataframe() -> pd.DataFrame:
+    base_dir = Path(__file__).resolve().parent / "data"
+    frames: list[pd.DataFrame] = []
+    for dim, folder in BFM_DIM_DIRS.items():
+        data_folder = base_dir / folder
+        if not data_folder.exists():
+            continue
+        for csv_path in sorted(data_folder.glob("*.csv")):
+            df = pd.read_csv(csv_path)
+            df["source_file"] = csv_path.name
+            df["dim"] = dim
+            frames.append(df)
+    if not frames:
+        raise ValueError("No Back-and-Forth benchmark CSV files were found.")
+    df = pd.concat(frames, ignore_index=True)
+
+    df["distribution"] = df["dataset"].map(_parse_dataset_distribution)
+    df["size"] = pd.to_numeric(df["dataset"].str.extract(r"(\d+)p")[0], errors="coerce")
+    numeric_cols = set(BFM_PERFORMANCE_COLUMNS + BFM_MONGE_COLUMNS + [
+        "stepsize",
+        "stepsize_lower_bound",
+        "problem_index",
+        "time_counter",
+        "time",
+        "cost",
+    ])
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "time_counter" in df.columns:
+        df["runtime"] = df["time_counter"]
+    elif "time" in df.columns:
+        df["runtime"] = df["time"]
+    else:
+        df["runtime"] = np.nan
+    return df
