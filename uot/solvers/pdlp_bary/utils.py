@@ -1,3 +1,4 @@
+import math
 import timeit
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -5,7 +6,6 @@ from enum import IntEnum, auto
 from typing import Dict, List, NamedTuple, Optional, Union
 import functools
 
-import numpy as np
 from jax.tree_util import register_dataclass
 
 import chex
@@ -767,7 +767,7 @@ def create_barycenter_problem(
     weights: jnp.ndarray,
 ):
     M = marginals.shape[0]
-    n = np.prod(marginals.shape[1:])
+    n = math.prod(marginals.shape[1:])
     return BarycenterProblem(
         cost=jnp.broadcast_to(cost_matrix[None, ...], (M, *cost_matrix.shape)),
         cost_matrix_norm=M * jnp.linalg.norm(cost_matrix),

@@ -179,6 +179,16 @@ class BaseMeasure(ABC):
 
 
 class PointCloudMeasure(BaseMeasure):
+    """A probability measure represented as a weighted point cloud.
+
+    Args:
+        points: Array of shape ``(n, d)`` (or ``(n,)`` for 1-D, reshaped to ``(n,1)``).
+        weights: Non-negative array of shape ``(n,)`` summing to 1 (or normalised if
+            ``normalize=True``).
+        name: Optional human-readable label.
+        normalize: If ``True``, divide weights by their sum.
+    """
+
     kind = "point_cloud"
 
     def __init__(
@@ -248,6 +258,17 @@ class DiscreteMeasure(PointCloudMeasure):
 
 
 class GridMeasure(BaseMeasure):
+    """A probability measure on a regular tensor-product grid.
+
+    Args:
+        axes: List of 1-D arrays, one per dimension.  ``axes[i]`` contains the
+            grid coordinates along dimension ``i``.
+        weights_nd: ND weight array whose shape matches ``(len(axes[0]),
+            len(axes[1]), ...)``.
+        name: Optional human-readable label.
+        normalize: If ``True``, divide weights by their sum.
+    """
+
     kind = "grid"
 
     def __init__(

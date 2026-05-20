@@ -1,56 +1,70 @@
-import pandas as pd
-import jax.numpy as jnp
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable
-from uot.problems.base_problem import MarginalProblem
+from typing import Any, Protocol
+
+import jax.numpy as jnp
+import pandas as pd
+
 from uot.data.measure import BaseMeasure
-from uot.solvers.base_solver import BaseSolver
-from uot.utils.types import ArrayLike
+from uot.problems.base_problem import Problem
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.logging import logger
 from uot.utils.instantiate_solver import instantiate_solver
+from uot.utils.types import ArrayLike
 from uot.solvers.gradient_ascent._smith_best_lr import best_lr as _best_lr
+
+
+class SolveFn(Protocol):
+    """Signature expected by :class:`Experiment` for its ``solve_fn`` argument."""
+
+    def __call__(
+        self,
+        prob: Problem,
+        instance: BaseSolver,
+        marginals: list[BaseMeasure],
+        costs: list[ArrayLike],
+        **kwargs: Any,
+    ) -> dict[str, Any]: ...
 
 
 class Experiment:
     def __init__(
-            self,
-            name: str,
-            solve_fn: Callable[[MarginalProblem, BaseSolver, list[BaseMeasure],
-                                list[ArrayLike]], dict],
+        self,
+        name: str,
+        solve_fn: SolveFn,
     ):
         """
-        solve_fn: a function f(problem: MarginalProblem, solver: BaseSolver, **kwargs) -> metrics dict
+        Parameters
+        ----------
+        name:
+            Human-readable experiment name (stored in result DataFrames).
+        solve_fn:
+            A callable matching :class:`SolveFn` — typically one of the
+            ``measure_*`` functions from :mod:`uot.experiments.measurement`.
         """
         self.name = name
         self.solve_fn = solve_fn
 
-    def _run_lr_finder(self, solver: BaseSolver,
-                       marginals: list[BaseMeasure],
-                       costs: list[ArrayLike],
-                       **solver_kwargs) -> float:
-        lrs = []
-        losses = []
+    def _run_lr_finder(
+        self,
+        solver: BaseSolver,
+        marginals: list[BaseMeasure],
+        costs: list[ArrayLike],
+        **solver_kwargs: Any,
+    ) -> float:
         if not hasattr(solver, "find_lr"):
             raise RuntimeError(f"Solver {solver.__class__.__name__} has no `find_lr` method")
-        lrs, losses = solver.find_lr(
-            marginals=marginals,
-            costs=costs,
-            **solver_kwargs,
-        )
-        # just set the lr that gives the best dual value
-        lr = lrs[jnp.argmax(jnp.array(losses))]
-        # lr = _best_lr(
-        #     lrs=jnp.array(lrs),
-        #     losses=jnp.array(losses),
-        # )
-        return lr
+        lrs, losses = solver.find_lr(marginals=marginals, costs=costs, **solver_kwargs)
+        return float(lrs[jnp.argmax(jnp.array(losses))])
 
     def run_on_problems(
         self,
-        problems: Iterable[MarginalProblem],
+        problems: Iterable[Problem],
         solver: BaseSolver,
         progress_callback: Callable[[int], None] | None = None,
         use_cost_matrix: bool = True,
-        **solver_kwargs,
+        **solver_kwargs: Any,
     ) -> pd.DataFrame:
         results = []
         for i, problem in enumerate(problems):
@@ -102,7 +116,12 @@ class Experiment:
                 progress_callback(1)
         return pd.DataFrame(results)
 
-    def run_single(self, problem: MarginalProblem, solver: BaseSolver, **solver_kwargs) -> dict:
+    def run_single(
+        self,
+        problem: Problem,
+        solver: BaseSolver,
+        **solver_kwargs: Any,
+    ) -> dict[str, Any]:
         solver_inputs = problem.solver_inputs(include_cost=True)
         marginals = solver_inputs.marginals
         costs = solver_inputs.costs

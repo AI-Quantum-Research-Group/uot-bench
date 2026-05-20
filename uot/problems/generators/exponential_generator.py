@@ -40,7 +40,7 @@ class ExponentialGenerator(ProblemGenerator):
         self._measure_mode = measure_mode
         self.cell_discretization = cell_discretization
 
-    def generate(self, *args, **kwargs) -> Iterator[TwoMarginalProblem]:
+    def generate(self) -> Iterator[TwoMarginalProblem]:
         pdfs_num = 2 * self._num_datasets
         axes_support = get_axes(
             dim=self._dim,

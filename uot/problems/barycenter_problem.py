@@ -1,15 +1,13 @@
-from abc import ABC
 from collections.abc import Callable
 from typing import Any
 
-from jax import Array
-from numpy import dtype, ndarray
+import jax
 from uot.data.measure import BaseMeasure
 from uot.utils.types import ArrayLike
-from uot.problems.base_problem import MarginalProblem
+from uot.problems.base_problem import Problem
 
 
-class BarycenterProblem(MarginalProblem):
+class BarycenterProblem(Problem):
     def __init__(self, name: str,
                  measures: list[BaseMeasure],
                  cost_fn: Callable[..., Any],
@@ -30,11 +28,11 @@ class BarycenterProblem(MarginalProblem):
     def get_marginals(self) -> list[BaseMeasure]:
         return self.measures
 
-    def get_costs(self) -> list[ndarray[tuple[Any, ...], dtype[Any]] | Array]:
+    def get_costs(self) -> list[jax.Array]:
         if self._C is None:
             mu, *_ = self.measures
             X, _ = mu.as_point_cloud()
-            C = self._cost_fn(X, X)  # should return an (n × m) array
+            C = self._cost_fn(X, X)
             self._C = [C]
         return self._C
 
@@ -63,3 +61,7 @@ class BarycenterProblem(MarginalProblem):
             "marginals_size": marginals_size,
             "cost": self.cost_name,
         }
+
+    def free_memory(self) -> None:
+        self._C = None
+        self._cost_cache = [None] * len(self.cost_fns)

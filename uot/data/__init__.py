@@ -1,6 +1,7 @@
-from .measure import DiscreteMeasure, GridMeasure, PointCloudMeasure
+from .measure import BaseMeasure, DiscreteMeasure, GridMeasure, PointCloudMeasure
 
 __all__ = [
+    "BaseMeasure",
     "PointCloudMeasure",
     "DiscreteMeasure",
     "GridMeasure",

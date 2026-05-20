@@ -10,9 +10,9 @@ from uot.problems.barycenter_problem import BarycenterProblem
 from uot.problems.problem_generator import ProblemGenerator
 
 
-def one_problem(generator: ProblemGenerator, **kwargs) -> Any:
-    """Compatibility wrapper around `ProblemGenerator.one`."""
-    return generator.one(**kwargs)
+def one_problem(generator: ProblemGenerator) -> Any:
+    """Compatibility wrapper around :meth:`~uot.problems.Generator.one`."""
+    return generator.one()
 
 
 def stack_measure_weights(

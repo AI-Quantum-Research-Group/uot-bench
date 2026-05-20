@@ -1,6 +1,6 @@
+import math
 import jax
 import jax.numpy as jnp
-import numpy as np
 from typing import Tuple, Optional
 
 from uot.data.measure import PointCloudMeasure
@@ -113,5 +113,5 @@ def sinkhorn_divergence_with_solver(
         "maxiter": maxiter,
         "tol": tol,
         # optional W2-like scale (not a true metric, but common to report)
-        "sinkhorn_divergence_w2_like": float(np.sqrt(max(S_eps, 0.0))),
+        "sinkhorn_divergence_w2_like": math.sqrt(max(S_eps, 0.0)),
     }
