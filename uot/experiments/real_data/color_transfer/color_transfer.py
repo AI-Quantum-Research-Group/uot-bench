@@ -25,8 +25,7 @@ if os.environ.get('DEBUG', False):
     logger.setLevel(logging.DEBUG)
 
 
-if __name__ == "__main__":
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run color transfer via optimal transport")
 
     parser.add_argument(
@@ -100,3 +99,7 @@ if __name__ == "__main__":
 
     csv_path = os.path.join(base_dir, "color_transfer_results.csv")
     results.to_csv(csv_path, index=False)
+
+
+if __name__ == "__main__":
+    main()

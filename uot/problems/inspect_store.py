@@ -229,7 +229,7 @@ def plot_hdf5_dataset(path: str, outdir: str):
         plot_and_save(mu_pts, mu_w, nu_pts, nu_w, prefix)
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Inspect & save dataset visualizations.")
     input_group = parser.add_mutually_exclusive_group(required=True)
@@ -251,16 +251,17 @@ if __name__ == "__main__":
     os.makedirs(args.outdir, exist_ok=True)
 
     if args.store is not None:
-        logger.debug(f"Flag set to visualize store. Will read {args.store} and\
-        output to {args.outdir}")
+        logger.debug(f"Flag set to visualize store. Will read {args.store} and output to {args.outdir}")
         plot_store(args.store, args.outdir)
     elif args.dataset is not None:
-        logger.debug(f"Flag set to visualize dataset. Will read {args.dataset}\
-        and output to {args.outdir}")
+        logger.debug(f"Flag set to visualize dataset. Will read {args.dataset} and output to {args.outdir}")
         if args.dataset.endswith('.h5'):
             plot_hdf5_dataset(args.dataset, args.outdir)
         else:
             plot_dataset(args.dataset, args.outdir)
     else:
-        raise ValueError("No input data option (either store or \
-        dataset) was specified.")
+        raise ValueError("No input data option (either store or dataset) was specified.")
+
+
+if __name__ == "__main__":
+    main()

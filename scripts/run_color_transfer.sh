@@ -18,11 +18,7 @@ RUN_CFG="$1"
 
 # mkdir -p "$RESULT_DIR" logs
 
-# activate conda environment if available
-if [[ -f ~/miniconda3/etc/profile.d/conda.sh ]]; then
-  source ~/miniconda3/etc/profile.d/conda.sh
-  conda activate ot
-fi
+# Assumes the project venv is already active (e.g. source .venv/bin/activate)
 
 # JAX settings suitable for most runs
 export JAX_ENABLE_X64="True"
@@ -33,6 +29,3 @@ export XLA_PYTHON_CLIENT_ALLOCATOR="platform"
 echo "Running benchmark from $RUN_CFG"
 python -m uot.experiments.real_data.color_transfer.color_transfer --config "$RUN_CFG"
 
-if type conda >/dev/null 2>&1; then
-  conda deactivate
-fi

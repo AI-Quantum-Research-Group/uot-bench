@@ -43,15 +43,22 @@ nav:
   - Getting started:
       - Install: install.md
       - Quickstart: quickstart.md
-  - Guides:
-      - Writing custom Problem/Generator: extending.md
-      - Problems: problems.md
-      - Generators: generators.md
-      - SLURM: slurm.md
-  - Experiments:
-      - Color Transfer: color_transfer.md
-      - MNIST: mnist.md
-  - API reference:
+  - Library guide:
+      - Concepts: guide/concepts.md
+      - Writing a custom Problem: guide/custom-problem.md
+      - Writing a custom Generator: guide/custom-generator.md
+      - Writing a custom Solver: guide/custom-solver.md
+      - Running an Experiment in Python: guide/experiments.md
+      - Measures and cost functions: guide/measures.md
+  - CLI & YAML:
+      - Overview: cli/index.md
+      - Generating datasets: cli/serialize.md
+      - Running benchmarks: cli/benchmark.md
+      - Color transfer: cli/color-transfer.md
+      - MNIST: cli/mnist.md
+      - SLURM: cli/slurm.md
+  - Reference:
+      - uot (top-level): api/uot.md
       - uot.problems: api/problems.md
       - uot.solvers: api/solvers.md
       - uot.experiments: api/experiments.md

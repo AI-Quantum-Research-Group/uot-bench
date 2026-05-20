@@ -21,11 +21,7 @@ RESULT_DIR="${RESULT_DIR:-results}"
 
 mkdir -p "$RESULT_DIR" logs
 
-# activate conda environment if available
-if [[ -f ~/miniconda3/etc/profile.d/conda.sh ]]; then
-  source ~/miniconda3/etc/profile.d/conda.sh
-  conda activate ot
-fi
+# Assumes the project venv is already active (e.g. source .venv/bin/activate)
 
 # JAX settings suitable for most runs
 export JAX_ENABLE_X64="True"
@@ -48,6 +44,3 @@ python -m uot.experiments.synthetic.benchmark \
   --folds "$FOLDS" \
   --export "$RESULT_DIR/$(basename "$RUN_CFG" .yaml).csv"
 
-if type conda >/dev/null 2>&1; then
-  conda deactivate
-fi

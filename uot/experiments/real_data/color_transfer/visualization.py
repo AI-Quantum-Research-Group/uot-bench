@@ -197,8 +197,7 @@ class OptimalTransportGallery:
         self.app.run(debug=debug, port=port)
 
 
-if __name__ == "__main__":
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Optimal Transport Gallery Dashboard")
 
     parser.add_argument(
@@ -219,3 +218,7 @@ if __name__ == "__main__":
 
     gallery = OptimalTransportGallery(args.origin_folder, args.results_folder)
     gallery.run_server(debug=False, port=8050)
+
+
+if __name__ == "__main__":
+    main()

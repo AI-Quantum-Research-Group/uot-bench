@@ -3,7 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 from collections.abc import Sequence
 
-from uot.data.measure import PointCloudMeasure
+from uot.data.measure import BaseMeasure, PointCloudMeasure
 from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
@@ -12,7 +12,7 @@ class LinearProgrammingTwoMarginalSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         numItermax: int = 100_000,
     ) -> SolverOutput:

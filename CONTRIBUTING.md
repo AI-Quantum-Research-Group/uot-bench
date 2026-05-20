@@ -56,7 +56,8 @@ Note: `uot/algorithms/rapdhg/` and `uot/solvers/pdlp_bary/` are **diverged** cop
 
 ## Writing a custom Problem or Generator
 
-See [docs/extending.md](docs/extending.md) for complete worked examples.
+See [docs/guide/custom-problem.md](docs/guide/custom-problem.md) and
+[docs/guide/custom-generator.md](docs/guide/custom-generator.md) for complete worked examples.
 
 ## Reporting bugs
 

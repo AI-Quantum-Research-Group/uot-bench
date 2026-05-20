@@ -140,8 +140,7 @@ def compute_distances_for_all_solvers(X: ArrayLike,
     logger.info("All pairwise distances computed successfully.")
 
 
-if __name__ == "__main__":    
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Compute pairwise distances using specified solvers.")
 
     parser.add_argument(
@@ -152,7 +151,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
+
     with open(args.config) as file:
         config = yaml.safe_load(file)
 
@@ -168,3 +167,7 @@ if __name__ == "__main__":
         raise ValueError("Configuration file must contain 'output-dir' key.")
 
     compute_distances_for_all_solvers(X, C, solver_configs, batch_size=batch_size, export_folder=export_folder)
+
+
+if __name__ == "__main__":
+    main()

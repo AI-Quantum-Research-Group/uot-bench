@@ -17,12 +17,15 @@ class SolverOutput(TypedDict):
     """
 
     cost: jax.Array | float
-    coupling: NotRequired[jax.Array]
+    transport_plan: NotRequired[jax.Array]
+    coupling: NotRequired[jax.Array]          # back-compat alias for transport_plan
     iterations: NotRequired[int]
     converged: NotRequired[bool]
+    error: NotRequired[float | jax.Array]
     # Potentials (dual variables)
     u_final: NotRequired[jax.Array]
     v_final: NotRequired[jax.Array]
+    potentials: NotRequired[tuple[jax.Array, jax.Array]]
     # Monge map / push-forward
     monge_map: NotRequired[jax.Array]
     # Extra solver-specific fields — solvers may add more keys

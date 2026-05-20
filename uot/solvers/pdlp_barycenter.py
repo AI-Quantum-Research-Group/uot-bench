@@ -9,7 +9,7 @@ from jax import numpy as jnp
 from uot.solvers.pdlp_bary import raPDHG, create_barycenter_problem
 from functools import partial
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
 class PDLPBarycenterSolver(BaseSolver):
@@ -47,7 +47,7 @@ class PDLPBarycenterSolver(BaseSolver):
 
 @partial(jax.jit, static_argnums=(4, 5))
 def _solve_pdlp_barycenter(
-    cost: jnp.ndarray,
+    cost: jax.Array,
     marginals: Sequence[ArrayLike],
     weights: ArrayLike,
     epsilon: float = 1e-3,

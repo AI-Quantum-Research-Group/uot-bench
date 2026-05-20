@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, NotRequired, Required, TypedDict, cast
 
 import jax
 
@@ -10,19 +10,60 @@ from gpu_tracker.tracker import Tracker
 
 from uot.data.measure import BaseMeasure
 from uot.problems.base_problem import Problem
+from uot.problems.protocols import HasExactCost
 from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 
-def _wait_jax_finish(result: dict[str, Any]) -> dict[str, Any]:
+class MeasurementTime(TypedDict):
+    time: float
+
+
+class MeasurementTimeAndOutput(TypedDict, total=False):
+    cost: Required[jax.Array | float]
+    time: Required[float]
+    transport_plan: jax.Array
+    coupling: jax.Array
+    iterations: int
+    converged: bool
+    error: float | jax.Array
+    u_final: jax.Array
+    v_final: jax.Array
+    potentials: tuple[jax.Array, jax.Array]
+    monge_map: jax.Array
+
+
+class MeasurementPrecision(TypedDict):
+    cost_rerr: float
+
+
+class MeasurementGPU(TypedDict, total=False):
+    cost: jax.Array | float
+    time: float
+    time_unit: str
+    time_counter: float
+    gpu_mem_unit: str
+    peak_gpu_mem: float
+    combined_peak_gpu_ram: float
+    peak_gpu_util_pct: float
+    mean_gpu_util_pct: float
+    peak_ram_MiB: float
+    combined_peak_ram_MiB: float
+    max_cpu_util_pct: float
+    mean_cpu_util_pct: float
+    iterations: int
+    error: float | jax.Array
+
+
+def _wait_jax_finish(result: Mapping[str, Any]) -> None:
     """Block until all JAX arrays in *result* are ready."""
-    return jax.tree.map(
+    jax.tree.map(
         lambda x: x.block_until_ready() if isinstance(x, jax.Array) else x,
         result,
     )
 
 
-def _require(result: dict[str, Any], required: set[str]) -> None:
+def _require(result: Mapping[str, Any], required: set[str]) -> None:
     missing = required - result.keys()
     if missing:
         raise RuntimeError(f"Solver returned no {missing!r} fields")
@@ -34,7 +75,7 @@ def measure_time(
     marginals: Sequence[BaseMeasure],
     costs: Sequence[ArrayLike],
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> MeasurementTime:
     """Run *instance* and return ``{"time": ms}``."""
     start_time = time.perf_counter()
     solution = instance.solve(marginals=marginals, costs=costs, **kwargs)
@@ -48,14 +89,14 @@ def measure_time_and_output(
     marginals: Sequence[BaseMeasure],
     costs: Sequence[ArrayLike],
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> MeasurementTimeAndOutput:
     """Run *instance* and return timing + all solver output fields."""
     start_time = time.perf_counter()
     solution: SolverOutput = instance.solve(marginals=marginals, costs=costs, **kwargs)
     _wait_jax_finish(solution)
     metrics: dict[str, Any] = {"time": (time.perf_counter() - start_time) * 1000}
     metrics.update(solution)
-    return metrics
+    return metrics  # type: ignore[return-value]
 
 
 def measure_solution_precision(
@@ -64,12 +105,14 @@ def measure_solution_precision(
     marginals: Sequence[BaseMeasure],
     costs: Sequence[ArrayLike],
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> MeasurementPrecision:
     """Run *instance* and return relative cost error vs. exact solution."""
     result: SolverOutput = instance.solve(marginals=marginals, costs=costs, **kwargs)
     _wait_jax_finish(result)
     _require(result, {"cost"})
-    exact = prob.get_exact_cost()  # type: ignore[attr-defined]
+    if not isinstance(prob, HasExactCost):
+        raise TypeError(f"{type(prob).__name__} does not implement get_exact_cost()")
+    exact = prob.get_exact_cost()
     return {"cost_rerr": abs(exact - result["cost"]) / exact}
 
 
@@ -79,7 +122,7 @@ def measure_with_gpu_tracker(
     marginals: Sequence[BaseMeasure],
     costs: Sequence[ArrayLike],
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> MeasurementGPU:
     """Run *instance* inside a GPU/CPU resource tracker and return detailed metrics."""
     import jax.numpy as jnp
 
@@ -89,17 +132,17 @@ def measure_with_gpu_tracker(
         time_unit="seconds",
     ) as gt:
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = instance.solve(marginals=marginals, costs=costs, **kwargs)
+        metrics: dict[str, Any] = cast(dict[str, Any], instance.solve(marginals=marginals, costs=costs, **kwargs))
         _wait_jax_finish(metrics)
         finish_time = time.perf_counter()
 
         if instance.__class__.__name__ == "BackNForthSqEuclideanSolver":
-            axes_mu = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[0]
+            axes_mu = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[0]  # type: ignore[attr-defined]
             grids = jnp.meshgrid(*axes_mu, indexing="ij")
             X = jnp.stack(grids, axis=-1)
-            mu_nd = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[1]
-            nu_nd = marginals[1].as_grid(backend="jax", dtype=jnp.float64)[1]
-            extra = instance._extra_metrics(
+            mu_nd = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[1]  # type: ignore[attr-defined]
+            nu_nd = marginals[1].as_grid(backend="jax", dtype=jnp.float64)[1]  # type: ignore[attr-defined]
+            extra = instance._extra_metrics(  # type: ignore[attr-defined]
                 mu_nd=mu_nd,
                 nu_nd=nu_nd,
                 axes_mu=axes_mu,
@@ -140,4 +183,4 @@ def measure_with_gpu_tracker(
             "mean_cpu_util_pct": cpu_utilization.main.mean_hardware_percent,
         }
     )
-    return metrics
+    return metrics  # type: ignore[return-value]

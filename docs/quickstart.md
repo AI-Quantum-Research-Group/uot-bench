@@ -69,4 +69,4 @@ print(df[["name", "reg", "time", "cost"]].to_string())
 
 ## Writing your own Problem or Generator
 
-See [Writing custom Problem/Generator](extending.md) for full worked examples.
+See [Library guide](guide/concepts.md) for full worked examples.

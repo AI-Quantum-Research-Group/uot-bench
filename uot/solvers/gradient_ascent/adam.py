@@ -5,8 +5,8 @@ import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 from uot.solvers.gradient_ascent._make_schedule import _make_schedule
@@ -40,7 +40,7 @@ class AdamGradientAscentSolver(BaseSolver):
     # ------------------------------------------------------------------
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float,
         maxiter: int,
@@ -48,7 +48,7 @@ class AdamGradientAscentSolver(BaseSolver):
         *args,
         normalize_cost: bool = True,
         **kwargs,
-    ) -> dict:
+    ) -> SolverOutput:
         a = marginals[0].as_point_cloud()[1]
         b = marginals[1].as_point_cloud()[1]
         cost_original = costs[0]
@@ -88,7 +88,7 @@ class AdamGradientAscentSolver(BaseSolver):
         base_lr: float = 1e-7,
         max_lr: float = 10.0,
         **kwargs,
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    ) -> tuple[jax.Array, jax.Array]:
         a = marginals[0].as_point_cloud()[1]
         b = marginals[1].as_point_cloud()[1]
         C = costs[0]
@@ -110,16 +110,16 @@ class AdamGradientAscentSolver(BaseSolver):
 # ----------------------------------------------------------------------
 @partial(jax.jit, static_argnums=(3, 4, 5, 7, 8))
 def _gradient(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    C: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    C: jax.Array,
     eps: float,
     maxiter: int,
     tol: float,
     opt_state: optax.OptState,
     optimizer: optax.GradientTransformation,
     schedule: optax.Schedule,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, int, float]:
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, int, float]:
     phi0 = jnp.zeros_like(a)
     psi0 = jnp.zeros_like(b)
     i0, err0 = 0, jnp.inf
@@ -169,16 +169,16 @@ def _gradient(
 # ----------------------------------------------------------------------
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 8))
 def _lr_finder(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    C: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    C: jax.Array,
     eps: float,
     num_iters: int,
     base_lr: float,
     max_lr: float,
     opt_state: optax.OptState,
     optimizer: optax.GradientTransformation,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
+) -> tuple[jax.Array, jax.Array]:
     phi0 = jnp.zeros_like(a)
     psi0 = jnp.zeros_like(b)
 

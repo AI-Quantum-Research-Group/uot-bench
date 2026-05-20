@@ -42,6 +42,15 @@ dependencies = [
     "tqdm",
 ]
 
+[project.scripts]
+uot-serialize            = "uot.problems.problem_serializer:main"
+uot-benchmark            = "uot.experiments.synthetic.benchmark:main"
+uot-color-transfer       = "uot.experiments.real_data.color_transfer.color_transfer:main"
+uot-color-transfer-viz   = "uot.experiments.real_data.color_transfer.visualization:main"
+uot-mnist-distances      = "uot.experiments.real_data.mnist_classification.count_pairwise_distances:main"
+uot-mnist-classification = "uot.experiments.real_data.mnist_classification.mnist_classification:main"
+uot-inspect-store        = "uot.problems.inspect_store:main"
+
 [project.urls]
 Homepage = "https://github.com/AI-Quantum-Research-Group/uot-bench"
 Repository = "https://github.com/AI-Quantum-Research-Group/uot-bench"
@@ -152,5 +161,6 @@ ignore = ["I001", "E402"]
 
 [tool.pyright]
 include = ["uot"]
-typeCheckingMode = "basic"
+typeCheckingMode = "standard"
 pythonVersion = "3.11"
+reportMissingTypeStubs = "warning"

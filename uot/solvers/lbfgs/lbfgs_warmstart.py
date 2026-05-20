@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 from jaxopt import LBFGS, OptStep
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 from uot.utils.solver_helpers import coupling_tensor
 
@@ -24,12 +24,12 @@ class WarmStartLBFGSTwoMarginalSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
         tol: float = 1e-6,
-    ) -> dict:
+    ) -> SolverOutput:
         if len(marginals) != 2:
             raise ValueError("WarmStartLBFGS solver accepts only two marginals.")
         if len(costs) == 0:

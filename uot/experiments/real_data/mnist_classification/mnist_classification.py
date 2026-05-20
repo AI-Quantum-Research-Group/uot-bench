@@ -94,8 +94,7 @@ def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: 
     return np.mean(scores)
 
 
-if __name__ == "__main__":
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run MNIST classification using precomputed OT distance matrices")
 
     parser.add_argument(
@@ -111,12 +110,12 @@ if __name__ == "__main__":
 
     with open(args.config) as file:
         config = yaml.safe_load(file)
-    
+
     rng_seed = config.get('rng-seed', 42)
 
     solver_configs = load_solvers(config=config)
 
-    try: 
+    try:
         costs_dir = config['costs-dir']
         export_folder = config['output-dir']
     except KeyError as e:
@@ -124,7 +123,7 @@ if __name__ == "__main__":
         raise ValueError(f"Configuration file must contain '{e.args[0]}' key.")
 
     pairwise_distances = load_pairwise_distances(solver_configs, costs_dir)
-    
+
     results = []
     for sample_size in config['sample-sizes']:
 
@@ -156,9 +155,13 @@ if __name__ == "__main__":
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = f"mnist_results_{timestamp}.csv"
-    
-    results = pd.DataFrame(results)
+
+    results_df = pd.DataFrame(results)
     output_path = os.path.join(export_folder, output_file)
-    results.to_csv(output_path, index=False)
+    results_df.to_csv(output_path, index=False)
 
     logger.info(f"Results saved to {output_path}")
+
+
+if __name__ == "__main__":
+    main()

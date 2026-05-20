@@ -4,272 +4,89 @@
 [![Python](https://img.shields.io/pypi/pyversions/uot-bench)](https://pypi.org/project/uot-bench/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-uot-bench is a Python toolkit for optimal transport solvers and benchmarking.
-It provides JAX-first implementations of common OT methods, utilities for
-generating problems and measures, and a configurable benchmarking pipeline for
-running experiments at scale.
+**uot-bench** is a Python toolkit for optimal transport solvers and benchmarking.
+It provides JAX-first implementations of common OT methods, utilities for generating
+problems and measures, and a configurable pipeline for running experiments at scale.
 
-> **Install name vs import name**: `pip install uot-bench`, then `import uot`.
+> **Package name vs import name**: `pip install uot-bench`, then `import uot`.
 
-- Documentation index: [docs/index.md](docs/index.md)
-- Problems module: [docs/problems.md](docs/problems.md)
-- Problem generators: [docs/generators.md](docs/generators.md)
-- Writing custom Problems/Generators: [docs/extending.md](docs/extending.md)
-- SLURM guide: [docs/slurm.md](docs/slurm.md)
-- Color transfer experiment: [docs/color_transfer.md](docs/color_transfer.md)
-- MNIST classification experiment: [docs/mnist.md](docs/mnist.md)
+Full documentation: [docs/](docs/index.md)
 
 ## Install
 
-Core install:
-```
+```bash
 pip install uot-bench
 ```
 
-Extras (optional):
-```
-pip install "uot-bench[viz,image-analysis,color-transfer,gurobi]"
+Optional extras:
+
+```bash
+pip install "uot-bench[viz,color-transfer,gurobi]"
 pip install "uot-bench[storage]"     # HDF5 problem store
 pip install "uot-bench[profiling]"   # GPU resource tracking
 pip install "uot-bench[mnist]"       # MNIST classification experiment
+pip install "uot-bench[cuda12]"      # JAX with CUDA 12
 pip install "uot-bench[all]"         # All optional extras
 ```
 
-CUDA (optional, JAX):
-```
-pip install "uot-bench[cuda12]"
-```
-
-## Quickstart (Python API)
-
-All primary classes are available directly from `uot`:
-
-```python
-from uot import (
-    Problem, Generator,          # base classes to subclass
-    TwoMarginalProblem,          # concrete problem types
-    BarycenterProblem,
-    BaseSolver, SolverConfig,    # solver infrastructure
-    Experiment, run_pipeline,    # experiment runner
-)
-```
-
-A minimal two-marginal Sinkhorn example:
+## 60-second example
 
 ```python
 import numpy as np
-
 from uot import TwoMarginalProblem
 from uot.data import PointCloudMeasure
 from uot.solvers import SinkhornTwoMarginalSolver
 from uot.utils.costs import cost_euclid_squared
 
-# Create two 1D point-cloud measures
 x = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
 y = np.linspace(0.0, 1.0, 64).reshape(-1, 1)
-
-a = np.exp(-((x - 0.3) ** 2) / 0.01).reshape(-1)
-a = a / a.sum()
-b = np.exp(-((y - 0.7) ** 2) / 0.02).reshape(-1)
-b = b / b.sum()
+a = np.exp(-((x - 0.3) ** 2) / 0.01).reshape(-1); a /= a.sum()
+b = np.exp(-((y - 0.7) ** 2) / 0.02).reshape(-1); b /= b.sum()
 
 mu = PointCloudMeasure(x, a, name="mu")
 nu = PointCloudMeasure(y, b, name="nu")
 
 problem = TwoMarginalProblem("toy", mu, nu, cost_euclid_squared)
-solver = SinkhornTwoMarginalSolver()
 inputs = problem.solver_inputs()
 
-result = solver.solve(
+result = SinkhornTwoMarginalSolver().solve(
     marginals=inputs.marginals,
     costs=inputs.costs,
     reg=1e-2,
 )
-
 print("cost:", float(result["cost"]))
 ```
 
-## Writing your own Problem / Generator
+See [docs/quickstart.md](docs/quickstart.md) for more examples, and
+[docs/guide/custom-solver.md](docs/guide/custom-solver.md) to write your own solver.
 
-`uot-bench` is designed to be extended. Subclass `uot.Problem` and
-`uot.Generator` to define custom problems and data sources, then plug them
+## CLI cheatsheet
+
+After `pip install uot-bench` the following console scripts are available.
+Each is equivalent to the `python -m <module>` form shown alongside it.
+
+| Console script | `python -m` equivalent | What it does | Schema |
+|---|---|---|---|
+| `uot-serialize --config X --export-dir Y` | `python -m uot.problems.problem_serializer` | Generate + persist problems to disk | [cli/serialize](docs/cli/serialize.md) |
+| `uot-benchmark --config X --export results.csv` | `python -m uot.experiments.synthetic.benchmark` | Run experiment over problems × solvers, write CSV | [cli/benchmark](docs/cli/benchmark.md) |
+| `uot-color-transfer --config X` | `python -m uot.experiments.real_data.color_transfer.color_transfer` | Color transfer experiment | [cli/color-transfer](docs/cli/color-transfer.md) |
+| `uot-color-transfer-viz --origin_folder X --results_folder Y` | `python -m uot.experiments.real_data.color_transfer.visualization` | Launch visualization dashboard | |
+| `uot-mnist-distances --config X` | `python -m uot.experiments.real_data.mnist_classification.count_pairwise_distances` | Step 1 of MNIST: pairwise OT distances | [cli/mnist](docs/cli/mnist.md) |
+| `uot-mnist-classification --config X` | `python -m uot.experiments.real_data.mnist_classification.mnist_classification` | Step 2 of MNIST: KNN classification | [cli/mnist](docs/cli/mnist.md) |
+| `uot-inspect-store --dataset X --outdir Y` | `python -m uot.problems.inspect_store` | Visualize a serialized problem dataset | |
+
+## Writing your own Problem / Generator / Solver
+
+Subclass `uot.Problem`, `uot.Generator`, or `uot.BaseSolver` and plug them
 directly into `Experiment` and `run_pipeline`.
 
-See **[docs/extending.md](docs/extending.md)** for complete worked examples,
-including how to implement all required abstract methods and use the result
-in a benchmarking pipeline.
-
-## Benchmarking CLI tools (Pixi)
-
-This project uses [Pixi](https://prefix.dev/docs/pixi/) to manage
-benchmarking dependencies and tasks.
-
-### Installing Pixi
-
-- [Linux](https://prefix.dev/docs/pixi/install#linux)
-- [macOS](https://prefix.dev/docs/pixi/install#macos)
-- [Windows](https://prefix.dev/docs/pixi/install#windows)
-
-After installation run `pixi install` to set up the environment. Available
-commands can be invoked with `pixi run <task>`.
-
-### Common commands
-
-- `pixi run serialize --config <config.yaml> --export-dir <directory>`
-- `pixi run benchmark --config <config.yaml> --folds <n> --export <file>`
-- `pixi run lint` or `ruff check .`
-
-## Slurm
-
-### On Compute Canada clusters
-
-The generic script for both SLURM and local runs is `scripts/run_benchmark.sh`.
-Example:
-```
-sbatch scripts/run_benchmark.sh configs/generators/gaussians.yaml configs/runners/gaussians.yaml
-```
-
-Monitor GPU usage with:
-```
-srun --jobid 123456 --pty watch -n 30 nvidia-smi
-```
-
-## Synthetic datasets
-
-Create a generator config like:
-
-```yaml
-generators:
-  1D-gaussians-64:
-    generator: uot.problems.generators.GaussianMixtureGenerator
-    dim: 1
-    num_components: 1
-    n_points: 64
-    num_datasets: 30
-    borders: (-6, 6)
-    cost_fn: uot.utils.costs.cost_euclid_squared
-    use_jax: true
-    seed: 42
-```
-
-Then serialize:
-```
-pixi run serialize --config configs/generators/gaussians.yaml --export-dir datasets/synthetic
-```
-
-## Running experiments
-
-Example config:
-
-```yaml
-param-grids:
-  regularizations:
-    - reg: 1
-    - reg: 0.001
-
-solvers:
-  sinkhorn:
-    solver: uot.solvers.sinkhorn.SinkhornTwoMarginalSolver
-    jit: true
-    param-grid: regularizations
-
-problems:
-  dir: datasets/synthetic
-  names:
-    - 1D-gaussians-64
-  
-experiment: 
-  name: Measure on Gaussians
-  function: uot.experiments.measurement.measure_time
-```
-
-Run the benchmark:
-```
-pixi run benchmark --config configs/runners/gaussians.yaml --folds 1 --export results/raw/gaussians.csv
-```
-
-## Color Transfer
-
-Example config:
-
-```yaml
-param-grids:
-  epsilons:
-    - reg: 1
-    - reg: 0.01
-
-solvers:
-  sinkhorn:
-    solver: uot.solvers.sinkhorn.SinkhornTwoMarginalSolver
-    param-grid: epsilons
-    jit: true
-
-bin-number:
-  - 16
-  - 32
-soft-extension:
-  - no
-  - yes
-displacement-interpolation:
-  - 0.0
-  - 1.0
-color-space: rgb
-# active-channels: [r, g]
-batch-size: 100000
-pair-number: 3
-images-dir: ./datasets/images
-rng-seed: 42
-
-drop-columns:
-  - transport_plan
-  - monge_map
-  - u_final
-  - v_final
-
-experiment: 
-  name: Time and test
-  output-dir: ./outputs/color_transfer
-```
-
-For detailed explanation of parameters, see [docs/color_transfer.md](docs/color_transfer.md).
-Notably, `soft-extension` and `displacement-interpolation` can be single values
-or lists, and the pipeline will run once per option.
-
-Example: Lab space with selected channels.
-```yaml
-color-space: lab
-active-channels: [l, a]
-```
-
-Run the experiment:
-```
-pixi run color-transfer --config ./configs/color_transfer/example.yaml
-```
-
-Dashboard visualization:
-```
-pixi run color-transfer-visualization --origin_folder <path_to_input_images> --results_folder <path_to_resulting_images>
-```
-
-## MNIST Classification
-
-The MNIST experiment is performed in two steps:
-
-- Distance matrix calculation
-- Classification
-
-See [docs/mnist.md](docs/mnist.md) for configs.
-
-Step 1:
-```
-pixi run mnist_distances --config ./configs/mnist_dist_example.yaml
-```
-
-Step 2:
-```
-pixi run mnist_classification --config ./configs/mnist_classification_example.yaml
-```
+- [Writing a custom Problem](docs/guide/custom-problem.md)
+- [Writing a custom Generator](docs/guide/custom-generator.md)
+- [Writing a custom Solver](docs/guide/custom-solver.md)
+- [Running experiments in Python](docs/guide/experiments.md)
 
 ## Linting
 
-Run `pixi run lint` or `ruff check .`.
+```bash
+ruff check .
+```

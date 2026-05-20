@@ -20,7 +20,7 @@ from uot.data.measure import (
     _supports_match,
 )
 from uot.utils.costs import cost_euclid_squared
-from uot.utils.types import ArrayLike
+from uot.utils.types import ArrayLike, Backend, ShareMode
 
 
 def _qualified_name(obj: Callable | None) -> str | None:
@@ -114,7 +114,7 @@ class Problem(ABC):
         self,
         name: str,
         measures: list[BaseMeasure],
-        cost_fns: list[Callable],
+        cost_fns: list[Callable[[ArrayLike, ArrayLike], ArrayLike]],
     ):
         super().__init__()
         if len(measures) < 2:
@@ -184,7 +184,7 @@ class Problem(ABC):
     def shared_support(
         self,
         *,
-        mode: str = "same",
+        mode: ShareMode = "same",
         include_zeros: bool = True,
         atol: float = 0.0,
         rtol: float = 0.0,
@@ -207,7 +207,7 @@ class Problem(ABC):
     def weights_on_shared_support(
         self,
         *,
-        mode: str = "same",
+        mode: ShareMode = "same",
         include_zeros: bool = True,
         atol: float = 0.0,
         rtol: float = 0.0,
@@ -246,7 +246,7 @@ class Problem(ABC):
     def point_cloud_inputs(
         self,
         *,
-        shared_support: str = "same",
+        shared_support: ShareMode = "same",
         include_cost: bool = True,
         include_zeros: bool = True,
         atol: float = 0.0,
@@ -273,7 +273,7 @@ class Problem(ABC):
         self,
         *,
         include_cost: bool = False,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
         device: jax.Device | None = None,
     ) -> GridInputs:
@@ -324,7 +324,7 @@ class Problem(ABC):
     def _shared_support_cache_key(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -340,7 +340,7 @@ class Problem(ABC):
     def _compute_shared_support(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -398,7 +398,7 @@ class Problem(ABC):
     def _prepared_shared_support(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -433,7 +433,7 @@ class Problem(ABC):
         self,
         *,
         support: ArrayLike,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,

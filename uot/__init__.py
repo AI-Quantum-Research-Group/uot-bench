@@ -26,7 +26,7 @@ from uot.experiments.experiment import Experiment
 from uot.experiments.runner import run_pipeline
 
 # Measures
-from uot.data.measure import BaseMeasure
+from uot.data.measure import BaseMeasure, PointCloudMeasure, GridMeasure
 
 __all__ = [
     "__version__",
@@ -49,6 +49,8 @@ __all__ = [
     "run_pipeline",
     # Measures
     "BaseMeasure",
+    "PointCloudMeasure",
+    "GridMeasure",
     # Deprecated aliases
     "MarginalProblem",
     "ProblemGenerator",

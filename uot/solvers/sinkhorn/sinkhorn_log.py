@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 
@@ -15,7 +15,7 @@ class SinkhornTwoMarginalLogJaxSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -23,7 +23,7 @@ class SinkhornTwoMarginalLogJaxSolver(BaseSolver):
         normalize_cost: bool = False,
         *args,
         **kwargs,
-    ) -> dict:
+    ) -> SolverOutput:
         if len(marginals) != 2:
             raise ValueError("Sinkhorn solver accepts only two marginals.")
         if len(costs) == 0:

@@ -3,15 +3,15 @@ from jax import numpy as jnp
 from jaxopt import LBFGS
 
 from collections.abc import Sequence
-from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
+from uot.data.measure import BaseMeasure, PointCloudMeasure
 from uot.utils.types import ArrayLike
 
 
 @jax.jit
 def lbfgs(
-    marginals: jnp.ndarray,
-    C: jnp.ndarray,
+    marginals: jax.Array,
+    C: jax.Array,
     epsilon: float,
     # core parameters
     tolerance: float,
@@ -62,7 +62,7 @@ class LBFGSPureSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -73,7 +73,7 @@ class LBFGSPureSolver(BaseSolver):
         maxls: int = 15,            # max inner iterations in LS
         stepsize: float = 0.0       # if \leq 0 runs a line-search, otherwise
                                     # takes a fixed step
-    ) -> dict:
+    ) -> SolverOutput:
         mu, nu = (
             marginals[0].as_point_cloud()[1],
             marginals[1].as_point_cloud()[1],

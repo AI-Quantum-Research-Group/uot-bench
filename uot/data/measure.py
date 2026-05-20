@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from uot.utils.types import ArrayLike
+from uot.utils.types import ArrayLike, Backend
 
 
 def _is_jax_array(x) -> bool:
@@ -149,7 +149,7 @@ def _align_weights(
 
 
 class BaseMeasure(ABC):
-    kind: str
+    kind: str  # "point_cloud" or "grid" — see subclasses
 
     @abstractmethod
     def as_point_cloud(self, include_zeros: bool = True) -> tuple[ArrayLike, ArrayLike]:
@@ -315,7 +315,7 @@ class GridMeasure(BaseMeasure):
     def as_grid(
         self,
         *,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
         device: jax.Device | None = None,
         normalize: bool = False,
@@ -348,7 +348,7 @@ class GridMeasure(BaseMeasure):
     def for_grid_solver(
         self,
         *,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
         device: jax.Device | None = None,
         normalize: bool = False,

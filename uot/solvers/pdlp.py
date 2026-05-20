@@ -1,7 +1,8 @@
 import jax
+from collections.abc import Sequence
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 from jax import numpy as jnp
@@ -11,22 +12,18 @@ from uot.algorithms.rapdhg.utils import RestartScheme
 from uot.algorithms.rapdhg.utils import OTProblem
 
 
-
-from typing import Sequence
-
-
 class PDLPSolver(BaseSolver):
     def __init__(self):
         return super().__init__()
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
         tol: float = 1e-6,
-    ) -> dict:
+    ) -> SolverOutput:
         if len(marginals) != 2:
             raise ValueError("PDLP solver accepts only two marginals.")
         if len(costs) == 0:
@@ -55,9 +52,9 @@ class PDLPSolver(BaseSolver):
 
 @jax.jit
 def _solve_pdlp(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    cost: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    cost: jax.Array,
     epsilon: float = 1e-3,
     precision: float = 1e-4,
     max_iters: int = 10_000,

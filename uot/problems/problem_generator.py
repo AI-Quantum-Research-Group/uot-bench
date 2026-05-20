@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from uot.problems.base_problem import GridInputs, Problem, MarginalProblem, PointCloudInputs, SolverInputs
+from uot.utils.types import Backend, ShareMode
 from collections.abc import Iterator
 
 
@@ -50,7 +51,7 @@ class Generator(ABC):
     def point_cloud_inputs(
         self,
         *,
-        shared_support: str = "same",
+        shared_support: ShareMode = "same",
         include_cost: bool = True,
         include_zeros: bool = True,
         atol: float = 0.0,
@@ -69,7 +70,7 @@ class Generator(ABC):
         self,
         *,
         include_cost: bool = False,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
         device=None,
     ) -> GridInputs:

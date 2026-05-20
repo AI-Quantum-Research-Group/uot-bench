@@ -5,8 +5,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 
@@ -16,13 +16,13 @@ class GradientAscentPlainLogSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float,            # ε: entropic regularization
         maxiter: int,          # maximum iterations
         tol: float,            # stopping tolerance on error
         learning_rate: float,  # α: gradient step size
-    ) -> dict:
+    ) -> SolverOutput:
         # Unpack inputs
         a = marginals[0].as_point_cloud()[1]
         b = marginals[1].as_point_cloud()[1]
@@ -46,9 +46,9 @@ class GradientAscentPlainLogSolver(BaseSolver):
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6))
 def _gradient(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    C: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    C: jax.Array,
     eps: float,
     maxiter: int,
     tol: float,
