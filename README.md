@@ -1,13 +1,20 @@
 # uot-bench
 
+[![PyPI](https://img.shields.io/pypi/v/uot-bench)](https://pypi.org/project/uot-bench/)
+[![Python](https://img.shields.io/pypi/pyversions/uot-bench)](https://pypi.org/project/uot-bench/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 uot-bench is a Python toolkit for optimal transport solvers and benchmarking.
 It provides JAX-first implementations of common OT methods, utilities for
 generating problems and measures, and a configurable benchmarking pipeline for
 running experiments at scale.
 
+> **Install name vs import name**: `pip install uot-bench`, then `import uot`.
+
 - Documentation index: [docs/index.md](docs/index.md)
 - Problems module: [docs/problems.md](docs/problems.md)
 - Problem generators: [docs/generators.md](docs/generators.md)
+- Writing custom Problems/Generators: [docs/extending.md](docs/extending.md)
 - SLURM guide: [docs/slurm.md](docs/slurm.md)
 - Color transfer experiment: [docs/color_transfer.md](docs/color_transfer.md)
 - MNIST classification experiment: [docs/mnist.md](docs/mnist.md)
@@ -22,6 +29,10 @@ pip install uot-bench
 Extras (optional):
 ```
 pip install "uot-bench[viz,image-analysis,color-transfer,gurobi]"
+pip install "uot-bench[storage]"     # HDF5 problem store
+pip install "uot-bench[profiling]"   # GPU resource tracking
+pip install "uot-bench[mnist]"       # MNIST classification experiment
+pip install "uot-bench[all]"         # All optional extras
 ```
 
 CUDA (optional, JAX):
@@ -31,14 +42,26 @@ pip install "uot-bench[cuda12]"
 
 ## Quickstart (Python API)
 
+All primary classes are available directly from `uot`:
+
+```python
+from uot import (
+    Problem, Generator,          # base classes to subclass
+    TwoMarginalProblem,          # concrete problem types
+    BarycenterProblem,
+    BaseSolver, SolverConfig,    # solver infrastructure
+    Experiment, run_pipeline,    # experiment runner
+)
+```
+
 A minimal two-marginal Sinkhorn example:
 
 ```python
 import numpy as np
 
-from uot.data.measure import PointCloudMeasure
-from uot.problems.two_marginal import TwoMarginalProblem
-from uot.solvers.sinkhorn import SinkhornTwoMarginalSolver
+from uot import TwoMarginalProblem
+from uot.data import PointCloudMeasure
+from uot.solvers import SinkhornTwoMarginalSolver
 from uot.utils.costs import cost_euclid_squared
 
 # Create two 1D point-cloud measures
@@ -65,6 +88,16 @@ result = solver.solve(
 
 print("cost:", float(result["cost"]))
 ```
+
+## Writing your own Problem / Generator
+
+`uot-bench` is designed to be extended. Subclass `uot.Problem` and
+`uot.Generator` to define custom problems and data sources, then plug them
+directly into `Experiment` and `run_pipeline`.
+
+See **[docs/extending.md](docs/extending.md)** for complete worked examples,
+including how to implement all required abstract methods and use the result
+in a benchmarking pipeline.
 
 ## Benchmarking CLI tools (Pixi)
 

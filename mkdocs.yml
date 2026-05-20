@@ -1,0 +1,72 @@
+site_name: uot-bench
+site_description: JAX-first optimal transport benchmarking toolkit
+site_url: https://AI-Quantum-Research-Group.github.io/uot-bench/
+repo_url: https://github.com/AI-Quantum-Research-Group/uot-bench
+repo_name: AI-Quantum-Research-Group/uot-bench
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            show_symbol_type_heading: true
+            members_order: source
+            docstring_style: google
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: install.md
+      - Quickstart: quickstart.md
+  - Guides:
+      - Writing custom Problem/Generator: extending.md
+      - Problems: problems.md
+      - Generators: generators.md
+      - SLURM: slurm.md
+  - Experiments:
+      - Color Transfer: color_transfer.md
+      - MNIST: mnist.md
+  - API reference:
+      - uot.problems: api/problems.md
+      - uot.solvers: api/solvers.md
+      - uot.experiments: api/experiments.md
+      - uot.data: api/data.md
+      - uot.utils: api/utils.md
+  - Changelog: changelog.md
+  - Contributing: contributing.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - tables
+  - attr_list

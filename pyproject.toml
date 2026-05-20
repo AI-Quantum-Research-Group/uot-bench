@@ -15,37 +15,51 @@ authors = [
 ]
 license = { text = "MIT" }
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
 ]
+requires-python = ">=3.11"
 dependencies = [
     "POT",
-    "Pillow",
     "PyYAML",
     "chex",
-    "gpu-tracker",
-    "h5py",
     "jax",
     "jaxopt",
     "numpy",
     "optax",
     "pandas",
-    "scikit-image",
-    "scikit-learn",
     "scipy",
     "toolz",
     "tqdm",
 ]
-requires-python = ">=3.11"
 
 [project.urls]
 Homepage = "https://github.com/AI-Quantum-Research-Group/uot-bench"
 Repository = "https://github.com/AI-Quantum-Research-Group/uot-bench"
 Issues = "https://github.com/AI-Quantum-Research-Group/uot-bench/issues"
+Documentation = "https://github.com/AI-Quantum-Research-Group/uot-bench/tree/main/docs"
 
 [project.optional-dependencies]
 cuda12 = [
     "jax[cuda12]",
+]
+storage = [
+    "h5py",
+]
+profiling = [
+    "gpu-tracker",
+]
+mnist = [
+    "scikit-learn",
 ]
 color-transfer = [
     "dash",
@@ -54,9 +68,6 @@ color-transfer = [
     "scikit-image",
     "plotly",
     "matplotlib",
-]
-gurobi = [
-    "gurobipy",
 ]
 image-analysis = [
     "Pillow",
@@ -73,6 +84,9 @@ viz = [
     "dataframe-image",
     "ipython",
 ]
+gurobi = [
+    "gurobipy",
+]
 testing = [
     "pytest>=7.0",
 ]
@@ -80,12 +94,40 @@ lint = [
     "black>=23.3.0",
     "ruff>=0.4.1",
 ]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "coverage",
+    "black>=23.3.0",
+    "ruff>=0.4.1",
+    "pyright",
+]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+all = [
+    "h5py",
+    "gpu-tracker",
+    "scikit-learn",
+    "Pillow",
+    "scikit-image",
+    "matplotlib",
+    "plotly",
+    "seaborn",
+    "dataframe-image",
+    "ipython",
+    "dash",
+    "opencv-python",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["uot*"]
 
 [tool.setuptools.package-data]
+"uot" = ["py.typed"]
 "uot.assets.toy_shapes" = ["*.png", "*.jpg", "*.jpeg", "*.webp"]
 
 [tool.setuptools.exclude-package-data]
@@ -103,8 +145,12 @@ target-version = ['py311']
 [tool.ruff]
 line-length = 80
 target-version = "py311"
-# Enable common rule sets except import sorting.
+
 [tool.ruff.lint]
 select = ["E", "F", "B", "UP"]
-# Disable Ruff's import sorting and allow code before imports for jax.
 ignore = ["I001", "E402"]
+
+[tool.pyright]
+include = ["uot"]
+typeCheckingMode = "basic"
+pythonVersion = "3.11"
