@@ -70,3 +70,6 @@ outputs/
 
 # GPU tracker files
 .gpu-tracker*
+
+# MkDocs build output
+site/
