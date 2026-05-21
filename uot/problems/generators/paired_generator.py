@@ -62,8 +62,8 @@ class PairedGenerator(ProblemGenerator):
         )
 
     def generate(self) -> Iterator[TwoMarginalProblem]:
-        iter_a: TwoMarginalProblem = self._gen_a.generate()
-        iter_b: TwoMarginalProblem = self._gen_b.generate()
+        iter_a = self._gen_a.generate()
+        iter_b = self._gen_b.generate()
 
         for _ in range(self._num_datasets):
             mu_problem = next(iter_a)
@@ -75,5 +75,5 @@ class PairedGenerator(ProblemGenerator):
                 name=self._name,
                 mu=mu,
                 nu=nu,
-                cost_fn=mu_problem._cost_fn,
+                cost_fn=mu_problem._cost_fn,  # type: ignore[attr-defined]
             )

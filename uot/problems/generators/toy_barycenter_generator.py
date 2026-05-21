@@ -26,7 +26,7 @@ class ShapeSelector(Protocol):
         *,
         available: Sequence[str],
         k: int,
-        key: jax.Array,
+        key: jax.Array | np.random.Generator | None = None,
     ) -> list[str]:
         ...
 
@@ -44,13 +44,13 @@ class ToyBarycenterGenerator(ProblemGenerator):
         super().__init__()
         self.selector = selector
         self.dim = 2
-        self.borders = [0., 1.]
+        self.borders: tuple[float, float] = (0., 1.)
         self.n_points = n_points
         self.num_datasets = num_datasets
         self.cost_fn = cost_fn
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
         self.use_jax = use_jax
-        self.measure_mode = measure_mode
+        self.measure_mode: MeasureMode = measure_mode
         if self.use_jax:
             self._key = jax.random.PRNGKey(seed)
         else:
@@ -104,8 +104,8 @@ class FixedListSelector(ShapeSelector):
     names: tuple[str, ...]
     strict_k: bool = True   # if we pass from generator k -> enforce match
 
-    def select(self, available: Sequence[str],
-               k: int | None, key=None) -> list[str]:
+    def select(self, *, available: Sequence[str],
+               k: int | None, key: jax.Array | np.random.Generator | None = None) -> list[str]:
         missing = [n for n in self.names if n not in available]
         if missing:
             raise ValueError(

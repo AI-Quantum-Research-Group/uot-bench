@@ -1,3 +1,6 @@
+from typing import cast
+
+from uot.data.measure import GridMeasure
 from uot.problems.problem_generator import ProblemGenerator
 from uot.problems.two_marginal import TwoMarginalProblem
 import numpy as np
@@ -55,7 +58,7 @@ def _collect_weights(
                     raise TypeError(
                         "Grid mode requires marginals to implement as_grid"
                     )
-                axes, weights_nd = marginal.as_grid()
+                axes, weights_nd = cast(GridMeasure, marginal).as_grid()
                 if support_axes is None:
                     support_axes = axes
                     support = _stack_grid_support(axes)

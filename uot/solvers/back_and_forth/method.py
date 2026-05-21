@@ -332,10 +332,13 @@ def backnforth_sqeuclidean_nd(
     def compute_error(iter_idx, dual_curr, dual_prev, grad_curr, grad_prev,
                       rho_mu=None, rho_nu=None):
         if error_metric == 'tv_psi':
+            assert rho_mu is not None
             err = 0.5 * jnp.sum(jnp.abs(rho_mu - nu))
         elif error_metric == 'tv_phi':
+            assert rho_nu is not None
             err = 0.5 * jnp.sum(jnp.abs(rho_nu - mu))
         elif error_metric == 'l_inf_psi':
+            assert rho_mu is not None
             err = jnp.max(jnp.abs(rho_mu - nu))
         elif error_metric == 'h1_psi':
             err = grad_curr

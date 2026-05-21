@@ -61,7 +61,7 @@ def compute_distances_np(X: ArrayLike,
 def compute_distances_jax(X: jnp.ndarray,
                           C: jnp.ndarray,
                           name: str,
-                          solver_fn: callable,
+                          solver_fn,
                           param_kwargs: dict,
                           export_folder: str,
                           batch_size: int = 10000):
@@ -132,16 +132,15 @@ def compute_distances_for_all_solvers(X: ArrayLike,
 
             if not solver.is_jit:
 
-                compute_distances_np(X, C, solver.name, solver.solver().solve, param_kwargs, export_folder)
-            
+                compute_distances_np(X, C, solver.name, solver.solver.solve, param_kwargs, export_folder)  # type: ignore[operator]
+
             else:
-                compute_distances_jax(X_jax, C_jax, solver.name, solver.solver().solve, param_kwargs, export_folder, batch_size)
+                compute_distances_jax(X_jax, C_jax, solver.name, solver.solver.solve, param_kwargs, export_folder, batch_size)  # type: ignore[operator]
 
     logger.info("All pairwise distances computed successfully.")
 
 
-if __name__ == "__main__":    
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Compute pairwise distances using specified solvers.")
 
     parser.add_argument(
@@ -152,7 +151,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
+
     with open(args.config) as file:
         config = yaml.safe_load(file)
 
@@ -168,3 +167,7 @@ if __name__ == "__main__":
         raise ValueError("Configuration file must contain 'output-dir' key.")
 
     compute_distances_for_all_solvers(X, C, solver_configs, batch_size=batch_size, export_folder=export_folder)
+
+
+if __name__ == "__main__":
+    main()

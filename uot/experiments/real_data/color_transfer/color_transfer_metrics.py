@@ -68,7 +68,7 @@ def compute_kl_divergence(source_grid: GridMeasure, target_grid: GridMeasure) ->
 
 def compute_ssim_metric(img1: np.ndarray, img2: np.ndarray) -> float:
     """Compute SSIM between two RGB images."""
-    return ssim(img1, img2, channel_axis=-1, data_range=1.0)
+    return float(ssim(img1, img2, channel_axis=-1, data_range=1.0))  # type: ignore[arg-type]
 
 def compute_delta_e(img1: np.ndarray, img2: np.ndarray) -> float:
     """Compute average ΔE (CIE76) between two images."""

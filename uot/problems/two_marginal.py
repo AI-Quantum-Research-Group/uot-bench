@@ -1,7 +1,7 @@
 import ot
 from collections.abc import Callable
 from uot.data.measure import BaseMeasure
-from uot.problems.base_problem import MarginalProblem
+from uot.problems.base_problem import Problem as MarginalProblem
 from uot.utils.types import ArrayLike
 
 from uot.utils.logging import logger
@@ -51,16 +51,17 @@ class TwoMarginalProblem(MarginalProblem):
         """
         if self._exact_cost is None:
             self._compute_exact_solution()
+        assert self._exact_cost is not None
         return self._exact_cost
 
-    def get_exact_coupling(self) -> float:
+    def get_exact_coupling(self) -> ArrayLike:
         """
-        Return exact map of transportation between measures
-        self._mu and self._nu, caching it in the self._exact_cost,
-        such that repeated calls do not recompute
+        Return exact transport plan between self._mu and self._nu,
+        caching it so repeated calls do not recompute.
         """
         if self._exact_coupling is None:
             self._compute_exact_solution()
+        assert self._exact_coupling is not None
         return self._exact_coupling
 
     def to_dict(self) -> dict:
@@ -91,8 +92,5 @@ class TwoMarginalProblem(MarginalProblem):
         self._exact_coupling = T
         self._exact_cost = log['cost']
 
-    def free_memory(self):
-        # TODO: as mentioned in the abstract class, consider removing this
-        #       method, as we should move all the responsiblity of the memory
-        #       management on the GC
+    def free_memory(self) -> None:
         self._C = None

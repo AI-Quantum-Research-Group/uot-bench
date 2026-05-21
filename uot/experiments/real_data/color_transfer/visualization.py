@@ -2,7 +2,7 @@ import os
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import dash
-from dash import dcc, html, Input, Output
+from dash import dcc, html, Input, Output  # type: ignore[import-untyped]
 from PIL import Image
 import numpy as np
 import argparse
@@ -79,27 +79,27 @@ class OptimalTransportGallery:
             html.Div([
                 html.Div([
                     html.Label("Source Image:", style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(
+                    dcc.Dropdown(  # type: ignore[attr-defined]
                         id='source-dropdown',
                         options=[{'label': img, 'value': img} for img in origin_images],
                         value=origin_images[0] if origin_images else None,
                         style={'width': '100%'}
                     )
                 ], style={'width': '30%', 'display': 'inline-block', 'marginRight': '5%'}),
-                
+
                 html.Div([
                     html.Label("Result Image:", style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(
+                    dcc.Dropdown(  # type: ignore[attr-defined]
                         id='result-dropdown',
                         options=[],
                         value=None,
                         style={'width': '100%'}
                     )
                 ], style={'width': '30%', 'display': 'inline-block', 'marginRight': '5%'}),
-                
+
                 html.Div([
                     html.Label("Target Image:", style={'fontWeight': 'bold'}),
-                    dcc.Dropdown(
+                    dcc.Dropdown(  # type: ignore[attr-defined]
                         id='target-dropdown',
                         options=[{'label': img, 'value': img} for img in origin_images],
                         value=origin_images[1] if len(origin_images) > 1 else None,
@@ -107,9 +107,9 @@ class OptimalTransportGallery:
                     )
                 ], style={'width': '30%', 'display': 'inline-block'})
             ], style={'marginBottom': '30px', 'padding': '20px'}),
-            
+
             html.Div([
-                dcc.Graph(id='image-gallery', style={'height': '600px'})
+                dcc.Graph(id='image-gallery', style={'height': '600px'})  # type: ignore[attr-defined]
             ])
         ])
     
@@ -197,8 +197,7 @@ class OptimalTransportGallery:
         self.app.run(debug=debug, port=port)
 
 
-if __name__ == "__main__":
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run the Optimal Transport Gallery Dashboard")
 
     parser.add_argument(
@@ -219,3 +218,7 @@ if __name__ == "__main__":
 
     gallery = OptimalTransportGallery(args.origin_folder, args.results_folder)
     gallery.run_server(debug=False, port=8050)
+
+
+if __name__ == "__main__":
+    main()

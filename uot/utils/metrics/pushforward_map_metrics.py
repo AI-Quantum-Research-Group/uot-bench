@@ -15,7 +15,7 @@ def extra_grid_metrics(
     axes_mu: Sequence[ArrayLike],
     X: jnp.ndarray,
     T: jnp.ndarray,
-    pushforward_mu: jnp.ndarray = None,
+    pushforward_mu: jnp.ndarray | None = None,
 ) -> dict:
     """
     Computes:
@@ -28,9 +28,10 @@ def extra_grid_metrics(
     NOTE on convention:
       We use general T(x) for metrics, assuming quadratic cost OT map.
     """
-    hs = [ax[1] - ax[0] if ax.shape[0] > 1 else 1.0 for ax in axes_mu]
+    hs: list[float] = [float(ax[1] - ax[0]) if ax.shape[0] > 1 else 1.0 for ax in axes_mu]  # type: ignore[index,union-attr]
 
     # (A) Push-forward TV distance
+    assert pushforward_mu is not None, "pushforward_mu must be provided"
     tv_mu_to_nu = 0.5 * jnp.sum(jnp.abs(pushforward_mu - nu_nd))
 
     # (B) Monge–Ampère residual

@@ -1,14 +1,13 @@
 from collections.abc import Sequence
 from functools import partial
-from typing import Tuple, List
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 
@@ -31,7 +30,7 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 50_000,
@@ -39,9 +38,9 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
         learning_rate: float | None = None,
         momentum: float | None = None,
         nesterov: bool | None = None,
-    ) -> dict:
+    ) -> SolverOutput:
         # extract weights a_i
-        a_list: List[jnp.ndarray] = [
+        a_list: list[jax.Array] = [
             jnp.asarray(m.as_point_cloud(include_zeros=False)[1])
             for m in marginals
             ]
@@ -64,7 +63,7 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
             learning_rate=lr, momentum=mom, nesterov=nes,
         )
 
-        return {
+        return {  # type: ignore[return-value]
             "transport_plan": plan,      # shape (n1,...,nN)
             "cost": cost,                # scalar
             "potentials": potentials,    # tuple(u1,...,uN)
@@ -75,15 +74,15 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
 
 # -------------------- helpers --------------------
 
-def _axes_except(i: int, N: int) -> Tuple[int, ...]:
+def _axes_except(i: int, N: int) -> tuple[int, ...]:
     return tuple(ax for ax in range(N) if ax != i)
 
-def _reshape_for_axis(u: jnp.ndarray, axis: int, N: int) -> jnp.ndarray:
+def _reshape_for_axis(u: jax.Array, axis: int, N: int) -> jax.Array:
     shape = [1] * N
     shape[axis] = u.shape[0]
     return u.reshape(shape)
 
-def _logsumexp_over_axes(x: jnp.ndarray, axes: Tuple[int, ...]) -> jnp.ndarray:
+def _logsumexp_over_axes(x: jax.Array, axes: tuple[int, ...]) -> jax.Array:
     if len(axes) == 0:
         return x
     m = jnp.max(x, axis=axes, keepdims=True)
@@ -93,7 +92,7 @@ def _logsumexp_over_axes(x: jnp.ndarray, axes: Tuple[int, ...]) -> jnp.ndarray:
         lse = jnp.squeeze(lse, axis=ax)
     return lse
 
-def _center_gauge_multi(us: Tuple[jnp.ndarray, ...]) -> Tuple[jnp.ndarray, ...]:
+def _center_gauge_multi(us: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
     """
     Zero-sum gauge: shifts sum to zero across marginals to keep sum_i u_i unchanged.
     """
@@ -103,10 +102,10 @@ def _center_gauge_multi(us: Tuple[jnp.ndarray, ...]) -> Tuple[jnp.ndarray, ...]:
     return tuple(u - s for u, s in zip(us, shifts))
 
 def _marginal_sums_from_potentials(
-    us: Tuple[jnp.ndarray, ...],
-    C: jnp.ndarray,
+    us: tuple[jax.Array, ...],
+    C: jax.Array,
     eps: float,
-) -> Tuple[Tuple[jnp.ndarray, ...], jnp.ndarray]:
+) -> tuple[tuple[jax.Array, ...], jax.Array]:
     """
     Compute marginal sums m_i[x_i] = sum_{x_{-i}} exp((sum_k u_k[x_k] - C)/eps)
     using stable log-sum-exp; also return log_K for possible reuse.
@@ -123,7 +122,7 @@ def _marginal_sums_from_potentials(
         marg_sums.append(jnp.exp(lse_i))
     return tuple(marg_sums), log_K
 
-def _residual_l2(marg_sums: Tuple[jnp.ndarray, ...], a_tuple: Tuple[jnp.ndarray, ...]) -> jnp.ndarray:
+def _residual_l2(marg_sums: tuple[jax.Array, ...], a_tuple: tuple[jax.Array, ...]) -> jax.Array:
     errs = [jnp.linalg.norm(ms - a, ord=2) for ms, a in zip(marg_sums, a_tuple)]
     return jnp.max(jnp.stack(errs))
 
@@ -132,8 +131,8 @@ def _residual_l2(marg_sums: Tuple[jnp.ndarray, ...], a_tuple: Tuple[jnp.ndarray,
 
 @partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
 def _mm_gradient_sgd(
-    a_list: List[jnp.ndarray],
-    C: jnp.ndarray,
+    a_list: list[jax.Array],
+    C: jax.Array,
     eps: float,
     maxiter: int,
     tol: float,
@@ -145,7 +144,7 @@ def _mm_gradient_sgd(
     Multi-marginal (N<=3) dual gradient ascent with SGD(+momentum/Nesterov).
     Returns: (plan, cost, potentials_tuple, iterations, final_residual_L2)
     """
-    a_tuple: Tuple[jnp.ndarray, ...] = tuple(a_list)
+    a_tuple: tuple[jax.Array, ...] = tuple(a_list)
     N = len(a_tuple)
 
     # init potentials
@@ -170,10 +169,10 @@ def _mm_gradient_sgd(
 
         # Optax does DESCENT; negate grads for ASCENT
         updates, opt_state = optimizer.update(tuple(-g for g in grads), opt_state, us)
-        us = optax.apply_updates(us, updates)
+        us = optax.apply_updates(us, updates)  # type: ignore[assignment]
 
         # gauge centering (zero-sum across marginals)
-        us = _center_gauge_multi(us)
+        us = _center_gauge_multi(us)  # type: ignore[arg-type]
 
         # residual for updated potentials
         marg_sums_new, _ = _marginal_sums_from_potentials(us, C, eps)

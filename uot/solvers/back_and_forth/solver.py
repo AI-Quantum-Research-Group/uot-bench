@@ -1,12 +1,12 @@
 from __future__ import annotations
 from collections.abc import Sequence
-from typing import Literal, Dict
+from typing import Literal, cast
 
 import jax.numpy as jnp
 
-from uot.data.measure import GridMeasure
+from uot.data.measure import BaseMeasure, GridMeasure
 from uot.utils.types import ArrayLike
-from uot.solvers.base_solver import BaseSolver
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.central_gradient_nd import _central_gradient_nd
 from uot.utils.import_helpers import import_object
 
@@ -30,7 +30,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
     Marginals must use cell-centered discretization for stability.
     """
 
-    _PUSHFORWARD_ALIASES: Dict[str, PushforwardFn] = {
+    _PUSHFORWARD_ALIASES: dict[str, PushforwardFn] = {
         "adaptive": adaptive_pushforward_nd,
         "adaptive_pushforward_nd": adaptive_pushforward_nd,
         "cic": cic_pushforward_nd,
@@ -39,7 +39,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         "forward_pushforward": cic_pushforward_nd,
         "_forward_pushforward_nd": cic_pushforward_nd,
     }
-    _C_TRANSFORM_ALIASES: Dict[str, CTransformFn] = {
+    _C_TRANSFORM_ALIASES: dict[str, CTransformFn] = {
         "quadratic_fast": c_transform_quadratic_fast,
         "c_transform_quadratic_fast": c_transform_quadratic_fast,
     }
@@ -59,7 +59,7 @@ class BackNForthSqEuclideanSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[GridMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],         # kept for BaseSolver signature compatability
         *args,
         maxiter: int = 1_000,
@@ -68,11 +68,11 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         error_metric: ErrorMetric = 'h1_psi',
         stepsize_lower_bound: float = 0.01,
         **kwargs,
-    ) -> dict:
+    ) -> SolverOutput:
         if len(marginals) != 2:
             raise ValueError("Back-and-Forth solver accepts only two marginals.")
 
-        mu, nu = marginals[0], marginals[1]
+        mu, nu = cast(GridMeasure, marginals[0]), cast(GridMeasure, marginals[1])
         axes_mu, mu_nd = mu.as_grid(backend="jax", dtype=jnp.float64)
         axes_nu, nu_nd = nu.as_grid(backend="jax", dtype=jnp.float64)
 
@@ -140,16 +140,16 @@ class BackNForthSqEuclideanSolver(BaseSolver):
 
 
         # ----- assemble result -----
-        out = {
+        out: SolverOutput = {
             "monge_map": monge_map,
             "cost": cost,
             "u_final": phi,
             "v_final": psi,
             "iterations": iters,
             "error": errors[iters - 1],
-            "marginal_error_L2": jnp.linalg.norm((rho_mu - nu_nd).ravel()),
-            "pushforward_fn_name": self._pushforward_fn_name,
         }
+        out["pushforward_fn_name"] = self._pushforward_fn_name  # type: ignore[typeddict-unknown-key]
+        out["marginal_error_L2"] = jnp.linalg.norm((rho_mu - nu_nd).ravel())  # type: ignore[typeddict-unknown-key]
         return out
 
     @classmethod
@@ -219,9 +219,9 @@ class BackNForthSqEuclideanSolver(BaseSolver):
         X,
         psi,
         T,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         psi_arr = jnp.asarray(psi).reshape(mu_nd.shape)
-        pushforward_mu, _ = self._pushforward_fn(mu_nd, psi_arr)
+        pushforward_mu, _ = self._pushforward_fn(mu_nd, psi_arr)  # type: ignore[misc]
         T_phys = self._monge_map_index_to_physical(T, axes_mu)
         metrics = extra_grid_metrics(
             mu_nd=mu_nd,

@@ -229,7 +229,7 @@ def _iter_packaged_image_asset_names() -> list[str]:
     return sorted(
         child.name
         for child in assets.iterdir()
-        if child.is_file() and child.suffix.lower() in TOY_IMAGE_EXTENSIONS
+        if child.is_file() and getattr(child, "suffix", "").lower() in TOY_IMAGE_EXTENSIONS
     )
 
 

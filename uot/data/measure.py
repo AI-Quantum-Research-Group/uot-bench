@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-from uot.utils.types import ArrayLike
+from uot.utils.types import ArrayLike, Backend
 
 
 def _is_jax_array(x) -> bool:
@@ -149,7 +149,7 @@ def _align_weights(
 
 
 class BaseMeasure(ABC):
-    kind: str
+    kind: str  # "point_cloud" or "grid" — see subclasses
 
     @abstractmethod
     def as_point_cloud(self, include_zeros: bool = True) -> tuple[ArrayLike, ArrayLike]:
@@ -179,6 +179,16 @@ class BaseMeasure(ABC):
 
 
 class PointCloudMeasure(BaseMeasure):
+    """A probability measure represented as a weighted point cloud.
+
+    Args:
+        points: Array of shape ``(n, d)`` (or ``(n,)`` for 1-D, reshaped to ``(n,1)``).
+        weights: Non-negative array of shape ``(n,)`` summing to 1 (or normalised if
+            ``normalize=True``).
+        name: Optional human-readable label.
+        normalize: If ``True``, divide weights by their sum.
+    """
+
     kind = "point_cloud"
 
     def __init__(
@@ -248,6 +258,17 @@ class DiscreteMeasure(PointCloudMeasure):
 
 
 class GridMeasure(BaseMeasure):
+    """A probability measure on a regular tensor-product grid.
+
+    Args:
+        axes: List of 1-D arrays, one per dimension.  ``axes[i]`` contains the
+            grid coordinates along dimension ``i``.
+        weights_nd: ND weight array whose shape matches ``(len(axes[0]),
+            len(axes[1]), ...)``.
+        name: Optional human-readable label.
+        normalize: If ``True``, divide weights by their sum.
+    """
+
     kind = "grid"
 
     def __init__(
@@ -294,9 +315,9 @@ class GridMeasure(BaseMeasure):
     def as_grid(
         self,
         *,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
         normalize: bool = False,
     ) -> tuple[list[ArrayLike], ArrayLike]:
         want_jax = (backend == "jax") or (
@@ -327,9 +348,9 @@ class GridMeasure(BaseMeasure):
     def for_grid_solver(
         self,
         *,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
         normalize: bool = False,
     ) -> tuple[list[ArrayLike], ArrayLike]:
         return self.as_grid(

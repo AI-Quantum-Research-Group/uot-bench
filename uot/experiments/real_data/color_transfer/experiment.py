@@ -1,6 +1,7 @@
 import os
 import datetime
 import hashlib
+from typing import Any, cast
 import pandas as pd
 from PIL import Image
 import jax
@@ -28,7 +29,7 @@ class ColorTransferExperiment(Experiment):
             output_dir: str = "output/color_transfer",
             drop_columns: list[str] = [],
     ):
-        super().__init__(name=name, solve_fn=measure_color_transfer_metrics)
+        super().__init__(name=name, solve_fn=measure_color_transfer_metrics)  # type: ignore[arg-type]
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.drop_columns = drop_columns
@@ -69,7 +70,7 @@ class ColorTransferExperiment(Experiment):
                 prob.name,
             )
 
-            metrics_entries = self.solve_fn(
+            metrics_entries_raw = self.solve_fn(
                 prob,
                 solver,
                 marginals,
@@ -78,8 +79,9 @@ class ColorTransferExperiment(Experiment):
                 displacement_alphas=self.displacement_alphas,
                 **solver_kwargs,
             )
-            if not isinstance(metrics_entries, list):
-                metrics_entries = [metrics_entries]
+            if not isinstance(metrics_entries_raw, list):
+                metrics_entries_raw = [metrics_entries_raw]
+            metrics_entries: list[dict[str, Any]] = cast(list[dict[str, Any]], metrics_entries_raw)
 
             for metrics in metrics_entries:
                 metrics["status"] = "success"
@@ -98,7 +100,7 @@ class ColorTransferExperiment(Experiment):
                     image_params['displacement_alpha'] = f"{metrics.get('displacement_alpha', 1.0):.3f}"
                     image = metrics['transported_image']
                     if hasattr(prob, "to_rgb_image"):
-                        image = prob.to_rgb_image(image)
+                        image = prob.to_rgb_image(image)  # type: ignore[attr-defined]
                     filename = self._save_image(image, prob, solver, image_params)
                     metrics["result_image_filename"] = filename
                     metrics.pop('transported_image', None)

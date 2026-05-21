@@ -84,7 +84,7 @@ def load_matrix_as_color_grid(pixels: ArrayLike, num_channels: int, bins_per_cha
         for idx in bins:
             weights_nd[tuple(idx)] += 1
 
-    axes = [bin_centers for _ in range(num_channels)]
+    axes: list[ArrayLike] = [bin_centers for _ in range(num_channels)]
 
     return GridMeasure(axes=axes, weights_nd=weights_nd, normalize=True)
 
@@ -143,7 +143,7 @@ def load_image_as_binary_grid(
     """
     image = Image.open(path).convert("L")
     if size is not None:
-        resample_mode = Image.BILINEAR if resample is None else resample
+        resample_mode = Image.BILINEAR if resample is None else resample  # type: ignore[attr-defined]
         image = image.resize(size, resample=resample_mode)
     data = np.asarray(image, dtype=np.float64) / 255.0
 

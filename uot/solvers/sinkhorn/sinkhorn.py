@@ -3,8 +3,8 @@ import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
 
-from uot.data.measure import PointCloudMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 
 from uot.utils.solver_helpers import tensor_marginals, coupling_tensor
@@ -16,12 +16,12 @@ class SinkhornTwoMarginalSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[PointCloudMeasure],
+        marginals: Sequence[BaseMeasure],
         costs: Sequence[ArrayLike],
         reg: float = 1e-3,
         maxiter: int = 1000,
         tol: float = 1e-6,
-    ) -> dict:
+    ) -> SolverOutput:
         if len(marginals) != 2:
             raise ValueError("Sinkhorn solver accepts only two marginals.")
         if len(costs) == 0:
@@ -75,9 +75,9 @@ class SinkhornTwoMarginalSolver(BaseSolver):
 
 @jax.jit
 def _sinkhorn(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    cost: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    cost: jax.Array,
     epsilon: float = 1e-3,
     precision: float = 1e-4,
     max_iters: int = 10_000,
@@ -129,13 +129,13 @@ def _sinkhorn(
 
 @jax.jit
 def _compute_error(
-    u: jnp.ndarray,
-    v: jnp.ndarray,
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    cost: jnp.ndarray,
+    u: jax.Array,
+    v: jax.Array,
+    a: jax.Array,
+    b: jax.Array,
+    cost: jax.Array,
     epsilon: float,
-) -> float:
+) -> jax.Array:
     P = coupling_tensor(u, v, cost, epsilon)
     row_marginal, col_marginal = tensor_marginals(P)
     return jnp.max(
@@ -148,11 +148,11 @@ def _compute_error(
 
 @jax.jit
 def coupling_from_scalings(
-    u: jnp.ndarray,
-    v: jnp.ndarray,
-    cost: jnp.ndarray,
+    u: jax.Array,
+    v: jax.Array,
+    cost: jax.Array,
     epsilon: float,
-) -> jnp.ndarray:
+) -> jax.Array:
     # Global shift improves numerical range without changing the OT solution:
     # K' = exp(-(C - c0)/eps) = exp(c0/eps) * exp(-C/eps); the factor is absorbed by scalings.
     # c0 = jnp.min(cost)
@@ -163,9 +163,9 @@ def coupling_from_scalings(
 
 @jax.jit
 def _sinkhorn_plain(
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    cost: jnp.ndarray,
+    a: jax.Array,
+    b: jax.Array,
+    cost: jax.Array,
     epsilon: float = 1e-3,
     precision: float = 1e-6,
     max_iters: int = 10_000,
@@ -219,12 +219,12 @@ def _sinkhorn_plain(
 
 @jax.jit
 def _compute_error_from_K(
-    u: jnp.ndarray,
-    v: jnp.ndarray,
-    a: jnp.ndarray,
-    b: jnp.ndarray,
-    K: jnp.ndarray,
-) -> float:
+    u: jax.Array,
+    v: jax.Array,
+    a: jax.Array,
+    b: jax.Array,
+    K: jax.Array,
+) -> jax.Array:
     P = (u[:, None] * K) * v[None, :]
     row_marginal, col_marginal = tensor_marginals(P)
     return jnp.max(

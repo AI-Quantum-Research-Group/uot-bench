@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import logging
 import sys
+from typing import IO
 
 
 def setup_logger(
-        name: str = "uot",
-        level: int = logging.INFO,
-        stream=sys.stdout
+    name: str = "uot",
+    level: int = logging.INFO,
+    stream: IO[str] = sys.stdout,
 ) -> logging.Logger:
     logger = logging.getLogger(name)
     if not logger.handlers:

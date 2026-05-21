@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import pickle
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +14,7 @@ import numpy as np
 from uot.data.measure import (
     BaseMeasure,
     GridMeasure,
+    PreparedAlignmentSupport,
     _align_weights_prepared,
     _prepare_alignment_support,
     _row_view,
@@ -20,7 +22,7 @@ from uot.data.measure import (
     _supports_match,
 )
 from uot.utils.costs import cost_euclid_squared
-from uot.utils.types import ArrayLike
+from uot.utils.types import ArrayLike, Backend, ShareMode
 
 
 def _qualified_name(obj: Callable | None) -> str | None:
@@ -69,12 +71,52 @@ class GridInputs:
     is_squared_euclidean: bool
 
 
-class MarginalProblem(ABC):
+class Problem(ABC):
+    """Base class for all optimal-transport problems.
+
+    Subclass this to define a custom problem and plug it into an
+    :class:`~uot.experiments.Experiment` or :func:`~uot.experiments.run_pipeline`.
+
+    **Minimal subclass example**::
+
+        import jax.numpy as jnp
+        from uot import Problem
+        from uot.data import PointCloudMeasure
+
+        class MyProblem(Problem):
+            def __init__(self, name, mu, nu, cost_fn):
+                super().__init__(name, [mu, nu], [cost_fn])
+
+            def get_marginals(self):
+                return self.measures
+
+            def get_costs(self):
+                X, _ = self.measures[0].as_point_cloud()
+                return [self.cost_fns[0](X, X)]
+
+            def to_dict(self):
+                return {"dataset": self.name}
+
+            def free_memory(self):
+                self._cost_cache = [None] * len(self.cost_fns)
+
+    **Abstract methods** (must be implemented):
+
+    - :meth:`get_marginals` — return list of :class:`~uot.data.BaseMeasure`
+    - :meth:`get_costs` — return list of cost matrices as JAX arrays
+    - :meth:`to_dict` — return a flat ``dict`` of metadata for DataFrame rows
+    - :meth:`free_memory` — release any cached arrays
+
+    **Optional overrides**:
+
+    - :meth:`get_lambdas` — return barycenter weights (default: ``None``)
+    """
+
     def __init__(
         self,
         name: str,
         measures: list[BaseMeasure],
-        cost_fns: list[Callable],
+        cost_fns: list[Callable[[ArrayLike, ArrayLike], ArrayLike]],
     ):
         super().__init__()
         if len(measures) < 2:
@@ -84,7 +126,7 @@ class MarginalProblem(ABC):
         self.cost_fns = cost_fns
         self._cost_cache = [None] * len(cost_fns)
         self._shared_support_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
-        self._prepared_support_cache: dict[tuple[str, bool, float, float], object] = {}
+        self._prepared_support_cache: dict[tuple[str, bool, float, float], PreparedAlignmentSupport] = {}
         self._aligned_weights_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
         self.__hash = None
 
@@ -119,13 +161,16 @@ class MarginalProblem(ABC):
         hex_key = self.key()[:16]
         return int(hex_key, 16)
 
+    @abstractmethod
     def get_marginals(self) -> list[BaseMeasure]:
-        raise NotImplementedError()
+        """Return the marginal measures for this problem."""
 
+    @abstractmethod
     def get_costs(self) -> list[ArrayLike]:
-        raise NotImplementedError()
+        """Return the cost matrices (as JAX arrays) for this problem."""
 
     def get_lambdas(self) -> ArrayLike | None:
+        """Return barycenter weights, or ``None`` for two-marginal problems."""
         return None
 
     def solver_inputs(self, include_cost: bool = True) -> SolverInputs:
@@ -141,7 +186,7 @@ class MarginalProblem(ABC):
     def shared_support(
         self,
         *,
-        mode: str = "same",
+        mode: ShareMode = "same",
         include_zeros: bool = True,
         atol: float = 0.0,
         rtol: float = 0.0,
@@ -164,7 +209,7 @@ class MarginalProblem(ABC):
     def weights_on_shared_support(
         self,
         *,
-        mode: str = "same",
+        mode: ShareMode = "same",
         include_zeros: bool = True,
         atol: float = 0.0,
         rtol: float = 0.0,
@@ -203,7 +248,7 @@ class MarginalProblem(ABC):
     def point_cloud_inputs(
         self,
         *,
-        shared_support: str = "same",
+        shared_support: ShareMode = "same",
         include_cost: bool = True,
         include_zeros: bool = True,
         atol: float = 0.0,
@@ -230,9 +275,9 @@ class MarginalProblem(ABC):
         self,
         *,
         include_cost: bool = False,
-        backend: str = "auto",
+        backend: Backend = "auto",
         dtype=None,
-        device: jax.Device | None = None,
+        device: jax.Device | None = None,  # type: ignore[name-defined]
     ) -> GridInputs:
         marginals = self.get_marginals()
         if not marginals:
@@ -240,22 +285,23 @@ class MarginalProblem(ABC):
         if not all(isinstance(m, GridMeasure) for m in marginals):
             raise TypeError("grid_inputs requires all marginals to be GridMeasure instances.")
 
-        reference = marginals[0]
-        for marginal in marginals[1:]:
+        grid_marginals = cast(list[GridMeasure], marginals)
+        reference = grid_marginals[0]
+        for marginal in grid_marginals[1:]:
             reference.check_compatible(marginal)
 
         axes, weights0 = reference.as_grid(
             backend=backend,
             dtype=dtype,
-            device=device,
+            device=device,  # type: ignore[arg-type]
         )
         xp = jnp if any(isinstance(ax, jax.Array) for ax in axes) or isinstance(weights0, jax.Array) else np
         weights = [weights0]
-        for marginal in marginals[1:]:
+        for marginal in grid_marginals[1:]:
             _, weight_nd = marginal.as_grid(
                 backend=backend,
                 dtype=dtype,
-                device=device,
+                device=device,  # type: ignore[arg-type]
             )
             weights.append(weight_nd)
 
@@ -281,7 +327,7 @@ class MarginalProblem(ABC):
     def _shared_support_cache_key(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -297,7 +343,7 @@ class MarginalProblem(ABC):
     def _compute_shared_support(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -315,8 +361,8 @@ class MarginalProblem(ABC):
 
         if mode == "same":
             if include_zeros and all(isinstance(m, GridMeasure) for m in marginals):
-                reference = first
-                for marginal in marginals[1:]:
+                reference = cast(GridMeasure, first)
+                for marginal in cast(list[GridMeasure], marginals)[1:]:
                     try:
                         reference.check_compatible(marginal, atol=atol, rtol=rtol)
                     except ValueError as exc:
@@ -345,7 +391,7 @@ class MarginalProblem(ABC):
         elif mode == "intersection":
             support = supports_np[0]
             for other in supports_np[1:]:
-                mask = np.in1d(_row_view(support), _row_view(other))
+                mask = np.isin(_row_view(support), _row_view(other))
                 support = support[mask]
         else:
             raise ValueError("mode must be 'same', 'union', 'intersection', or 'first'")
@@ -355,7 +401,7 @@ class MarginalProblem(ABC):
     def _prepared_shared_support(
         self,
         *,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -390,7 +436,7 @@ class MarginalProblem(ABC):
         self,
         *,
         support: ArrayLike,
-        mode: str,
+        mode: ShareMode,
         include_zeros: bool,
         atol: float,
         rtol: float,
@@ -400,12 +446,13 @@ class MarginalProblem(ABC):
 
         if mode == "same":
             if include_zeros and all(isinstance(m, GridMeasure) for m in marginals):
-                reference = first
-                _, first_weights = reference.as_grid()
+                grid_marginals_same = cast(list[GridMeasure], marginals)
+                reference_same = grid_marginals_same[0]
+                _, first_weights = reference_same.as_grid()
                 direct_weights = [first_weights.reshape(-1)]
-                for marginal in marginals[1:]:
+                for marginal in grid_marginals_same[1:]:
                     try:
-                        reference.check_compatible(marginal, atol=atol, rtol=rtol)
+                        reference_same.check_compatible(marginal, atol=atol, rtol=rtol)
                     except ValueError as exc:
                         raise self._shared_support_error() from exc
                     _, other_weights = marginal.as_grid()
@@ -426,12 +473,13 @@ class MarginalProblem(ABC):
         if mode == "first" and include_zeros and all(
             isinstance(m, GridMeasure) for m in marginals
         ):
-            reference = first
+            grid_marginals_first = cast(list[GridMeasure], marginals)
+            reference_first = grid_marginals_first[0]
             direct_weights = []
             compatible = True
-            for marginal in marginals:
+            for marginal in grid_marginals_first:
                 try:
-                    reference.check_compatible(marginal, atol=atol, rtol=rtol)
+                    reference_first.check_compatible(marginal, atol=atol, rtol=rtol)
                 except ValueError:
                     compatible = False
                     break
@@ -460,8 +508,30 @@ class MarginalProblem(ABC):
             )
         return self._stack_weights(support, aligned_weights)
 
+    @abstractmethod
     def to_dict(self) -> dict:
-        raise NotImplementedError()
+        """Return a flat dict of metadata to be stored as a DataFrame row."""
 
-    def free_memory(self):
-        raise NotImplementedError()
+    @abstractmethod
+    def free_memory(self) -> None:
+        """Release any large cached arrays (cost matrices, etc.)."""
+
+
+import warnings as _warnings
+
+
+def __getattr__(name: str):
+    if name == "MarginalProblem":
+        _warnings.warn(
+            "MarginalProblem is deprecated and will be removed in a future release. "
+            "Use Problem instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return Problem
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Keep a direct reference so existing `from uot.problems.base_problem import MarginalProblem`
+# continues to work (triggers __getattr__ which emits the warning).
+MarginalProblem = Problem

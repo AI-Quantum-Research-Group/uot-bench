@@ -9,14 +9,14 @@ from jax import numpy as jnp
 from uot.solvers.pdlp_bary import raPDHG, create_barycenter_problem
 from functools import partial
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
 class PDLPBarycenterSolver(BaseSolver):
     def __init__(self):
         return super().__init__()
 
-    def solve(
+    def solve(  # type: ignore[override]
         self,
         marginals: Sequence[PointCloudMeasure],
         costs: Sequence[ArrayLike],
@@ -24,6 +24,8 @@ class PDLPBarycenterSolver(BaseSolver):
         reg: float = 1e-3,
         maxiter: int = 1000,
         tol: float = 1e-6,
+        *args,
+        **kwargs,
     ) -> dict:
         if len(costs) == 0:
             raise ValueError("Cost tensors not defined.")
@@ -47,7 +49,7 @@ class PDLPBarycenterSolver(BaseSolver):
 
 @partial(jax.jit, static_argnums=(4, 5))
 def _solve_pdlp_barycenter(
-    cost: jnp.ndarray,
+    cost: jax.Array,
     marginals: Sequence[ArrayLike],
     weights: ArrayLike,
     epsilon: float = 1e-3,
@@ -57,7 +59,7 @@ def _solve_pdlp_barycenter(
     solver = raPDHG(
         verbose=False,
         jit=True,
-        reg=epsilon,
+        reg=epsilon,  # type: ignore[arg-type]
         eps_abs=precision,
         eps_rel=precision,
         iteration_limit=max_iters,
@@ -65,11 +67,11 @@ def _solve_pdlp_barycenter(
     )
     M = len(marginals)
 
-    problem = create_barycenter_problem(cost, marginals, weights)
+    problem = create_barycenter_problem(cost, marginals, weights)  # type: ignore[arg-type]
     result, _ = solver.optimize(problem, dim=problem.n)
 
-    couplings = result.primal_solution.P
-    barycenter = result.primal_solution.a
+    couplings = result.primal_solution.P  # type: ignore[attr-defined]
+    barycenter = result.primal_solution.a  # type: ignore[attr-defined]
     us = result.dual_solution[:M]
     vs = result.dual_solution[M:]
     iters = result.iteration_count

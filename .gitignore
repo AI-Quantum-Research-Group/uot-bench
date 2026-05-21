@@ -76,3 +76,5 @@ color_transfer_images/
 # GPU tracker files
 .gpu-tracker*
 
+# MkDocs build output
+site/

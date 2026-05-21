@@ -1,9 +1,22 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import cast
+
 import numpy as np
 from jax import numpy as jnp
-from uot.data.measure import GridMeasure, PointCloudMeasure
+
+from uot.data.measure import BaseMeasure, GridMeasure, PointCloudMeasure
+from uot.utils.types import ArrayLike
 
 
-def _build_measure(points, weights, axes, mode: str, use_jax: bool):
+def _build_measure(
+    points: ArrayLike,
+    weights: ArrayLike,
+    axes: Sequence,
+    mode: str,
+    use_jax: bool,
+) -> BaseMeasure:
     """
     mode: 'grid' | 'point_cloud' | 'auto'
     - 'grid': return GridMeasure (reshape weights to ND)
@@ -24,4 +37,4 @@ def _build_measure(points, weights, axes, mode: str, use_jax: bool):
 
     # 'grid' or 'auto' -> emit GridMeasure
     weights_nd = weights.reshape(shape)  # sampler already evaluated on the grid ordering
-    return GridMeasure(axes=axes, weights_nd=weights_nd, name="", normalize=False)
+    return GridMeasure(axes=cast(list[ArrayLike], list(axes)), weights_nd=weights_nd, name="", normalize=False)

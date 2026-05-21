@@ -1,8 +1,17 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
-import jax.numpy as jnp
+
+from uot.utils.types import ArrayLike
 
 
-def plot_ot_solution(x, pdf1, pdf2, transport_plan, title="Transport Plan"):
+def plot_ot_solution(
+    x: ArrayLike,
+    pdf1: ArrayLike,
+    pdf2: ArrayLike,
+    transport_plan: ArrayLike,
+    title: str = "Transport Plan",
+) -> None:
     """
     Plots the 1D transport plan with aligned marginals.
 

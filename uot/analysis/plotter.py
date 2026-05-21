@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython.display import display, HTML
-from uot.analysis import get_agg_table, get_mean_comparison_table, get_std_comparison_table, display_mean_and_std, display_all_metrics
+from uot.analysis import get_agg_table, get_mean_comparison_table, get_std_comparison_table, display_mean_and_std, display_all_metrics  # type: ignore[attr-defined]
 
 plt.style.use('ggplot')
 sns.set_palette("colorblind")

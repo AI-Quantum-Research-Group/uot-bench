@@ -10,7 +10,7 @@ def split_result_file(result_filepath: str, export_dir: str):
     solver_specification_solumns = df.columns.difference(aggregation_columns + ['time', 'cost_rerr', 'coupling_avg_err', 'converged', 'dataset', 'name'])
 
     df['problem_id'] = df[aggregation_columns].apply(lambda row: '|'.join([str(x) for x in row if pd.notna(x)]), axis=1)
-    df['solver_kwargs'] = pd.Series(df[solver_specification_solumns].to_dict(orient='records'))
+    df['solver_kwargs'] = pd.Series(df[solver_specification_solumns].to_dict(orient='records'))  # type: ignore[call-overload]
     df['name'] = df.apply(lambda row: f"{row['name']}({row['solver_kwargs']})" , axis=1)
     df['name'] = df['name'].str.replace(' ', '')
 
