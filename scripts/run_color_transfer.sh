@@ -18,7 +18,11 @@ RUN_CFG="$1"
 
 # mkdir -p "$RESULT_DIR" logs
 
-# Assumes the project venv is already active (e.g. source .venv/bin/activate)
+# activate conda environment if available
+if [[ -f ~/miniconda3/etc/profile.d/conda.sh ]]; then
+  source ~/miniconda3/etc/profile.d/conda.sh
+  conda activate ot
+fi
 
 # JAX settings suitable for most runs
 export JAX_ENABLE_X64="True"
