@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "uot_bench"
-version = "0.1.8"
+version = "0.1.9"
 description = "Utilities for optimal transport algorithms and benchmarking"
 readme = "README.md"
 authors = [
@@ -52,10 +52,10 @@ uot-mnist-classification = "uot.experiments.real_data.mnist_classification.mnist
 uot-inspect-store        = "uot.problems.inspect_store:main"
 
 [project.urls]
-Homepage = "https://github.com/AI-Quantum-Research-Group/uot-bench"
+Homepage = "https://ai-quantum-research-group.github.io/uot-bench/"
 Repository = "https://github.com/AI-Quantum-Research-Group/uot-bench"
 Issues = "https://github.com/AI-Quantum-Research-Group/uot-bench/issues"
-Documentation = "https://github.com/AI-Quantum-Research-Group/uot-bench/tree/main/docs"
+Documentation = "https://ai-quantum-research-group.github.io/uot-bench/"
 
 [project.optional-dependencies]
 cuda12 = [
