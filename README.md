@@ -21,6 +21,7 @@ pip install uot-bench
 Optional extras:
 
 ```bash
+pip install "uot-bench[ott]"         # OTT-JAX solver backend
 pip install "uot-bench[viz,color-transfer,gurobi]"
 pip install "uot-bench[storage]"     # HDF5 problem store
 pip install "uot-bench[profiling]"   # GPU resource tracking
@@ -84,6 +85,8 @@ directly into `Experiment` and `run_pipeline`.
 - [Writing a custom Generator](docs/guide/custom-generator.md)
 - [Writing a custom Solver](docs/guide/custom-solver.md)
 - [Running experiments in Python](docs/guide/experiments.md)
+- [Post-solve hooks](docs/guide/hooks.md)
+- [OTT-JAX interoperability](docs/guide/ott-interop.md)
 
 ## Linting
 

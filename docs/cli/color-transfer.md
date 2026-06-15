@@ -80,6 +80,33 @@ For each solver, `pair-number` source–target image pairs are sampled. The
 OT plan is computed and the source is transported to the target. The result CSV
 accumulates metrics for all pairs, solvers, and parameter combinations.
 
+## Programmatic API
+
+!!! warning "`ColorTransferExperiment` is deprecated"
+    The dedicated `ColorTransferExperiment` class and
+    `run_color_transfer_pipeline` are deprecated (they now emit a
+    `DeprecationWarning`). Use the generic `Experiment` + `run_pipeline` with the
+    `ColorTransferHook` post-solve hook instead:
+
+    ```python
+    from uot.experiments import Experiment, run_pipeline
+    from uot.experiments.measurement import measure_time_and_output
+    from uot.experiments.real_data.color_transfer.hooks import ColorTransferHook
+
+    hook = ColorTransferHook(
+        output_dir="output/color_transfer",
+        soft_extension_modes=[False, True],
+        displacement_alphas=[1.0, 0.5],
+    )
+    experiment = Experiment(name="CT", solve_fn=measure_time_and_output, hooks=[hook])
+    df = run_pipeline(experiment, solvers, iterators)
+    ```
+
+    The hook reconstructs transported images, computes domain metrics, and fans
+    out one result row per `(soft_extension, displacement_alpha)` combination.
+    See [Post-solve hooks](../guide/hooks.md). The `uot-color-transfer` CLI
+    behaviour is unchanged.
+
 ## Visualization dashboard
 
 ```bash

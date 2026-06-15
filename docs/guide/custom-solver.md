@@ -8,6 +8,7 @@ Subclass `uot.BaseSolver` to implement a new OT algorithm and plug it into
 ```python
 class BaseSolver(ABC):
     requires_squared_euclidean: bool = False   # set True if your solver needs ‖x-y‖²
+    input_kind: str = "marginals_costs"        # representation requested from the runner
 
     @abstractmethod
     def solve(
@@ -18,6 +19,10 @@ class BaseSolver(ABC):
         **kwargs,
     ) -> SolverOutput: ...
 ```
+
+The `solve` signature above is the default `input_kind = "marginals_costs"`
+contract. A solver can request a different prepared representation instead — see
+[Representation negotiation](#representation-negotiation-input_kind) below.
 
 **`SolverOutput`** is a `TypedDict` (from `uot.solvers.base_solver`).
 Only `cost` is required; all other keys are `NotRequired`:
@@ -34,6 +39,8 @@ class SolverOutput(TypedDict):
     v_final: NotRequired[jax.Array]
     potentials: NotRequired[tuple[jax.Array, jax.Array]]
     monge_map: NotRequired[jax.Array]
+    # Low-rank transport plan factors (Q, R, g); dense plan = Q @ diag(1/g) @ R.T
+    low_rank_plan: NotRequired[tuple[jax.Array, jax.Array, jax.Array]]
     time: NotRequired[float]
 ```
 
@@ -127,6 +134,46 @@ class MySolverOutput(SolverOutput, total=False):
     custom_metric: float
 ```
 
+## Representation negotiation (`input_kind`)
+
+By default the runner builds a `SolverInputs` view from each problem and calls
+`solve(marginals=…, costs=…, **kwargs)`. A solver can instead request a
+different *representation* by setting the class attribute `input_kind` to a kind
+registered in `uot.experiments.representations`:
+
+| `input_kind` | View passed to `solve` |
+|---|---|
+| `"marginals_costs"` (default) | `SolverInputs` → unpacked as `marginals=`, `costs=` |
+| `"point_cloud"` | `PointCloudInputs` (shared-support aligned) |
+| `"grid"` | `GridInputs` |
+| `"ott_linear"`, `"ott_quadratic"`, `"ott_barycenter"`, `"ott_gw_barycenter"` | pre-built OTT problem object (registered by `uot.interop.ott`) |
+
+For any non-default kind the prepared view is passed as the **first positional
+argument** to `solve` (not unpacked). The view is built **outside** the timed
+solve region and cached on the problem, so heavy translation never counts toward
+the measured solve time.
+
+```python
+class MyGeometrySolver(BaseSolver):
+    input_kind = "point_cloud"
+
+    def solve(self, view, **kwargs) -> SolverOutput:
+        support = view.support          # PointCloudInputs fields
+        a, b = view.weights
+        ...
+```
+
+Register your own kind once at import time:
+
+```python
+from uot.experiments.representations import register_representation
+
+register_representation("my_backend", lambda problem, **opts: _build(problem, **opts))
+```
+
+A builder has signature `(problem: Problem, **opts) -> view` and must accept and
+ignore unknown `**opts` (use `**_`).
+
 ## Plugging into an `Experiment`
 
 ```python
@@ -194,3 +241,18 @@ See [Running benchmarks](../cli/benchmark.md) for the full runner YAML schema.
 | `uot.solvers.GradientAscentTwoMarginalSolver` | First-order gradient ascent. |
 | `uot.solvers.LinearProgrammingTwoMarginalSolver` | Exact LP via the `ot` package. |
 | `uot.solvers.BackNForthSqEuclideanSolver` | Back-and-forth method (squared Euclidean). |
+
+## OTT-JAX solvers (`uot.interop.ott`)
+
+Requires `pip install "uot-bench[ott]"`. See [OTT-JAX interoperability](ott-interop.md) for the full guide.
+
+| Class | Description |
+|---|---|
+| `uot.interop.ott.OTTSinkhornSolver` | OTT Sinkhorn (LSE mode, full-rank). |
+| `uot.interop.ott.OTTLRSinkhornSolver` | OTT low-rank Sinkhorn; returns `low_rank_plan` factors. |
+| `uot.interop.ott.OTTGromovWassersteinSolver` | Entropic Gromov–Wasserstein (supports fused-GW). |
+| `uot.interop.ott.OTTLRGromovWassersteinSolver` | Low-rank GW. |
+| `uot.interop.ott.OTTSinkhornDivergence` | Debiased Sinkhorn divergence. |
+| `uot.interop.ott.OTTDiscreteBarycenterSolver` | Free-support Wasserstein barycenter. |
+| `uot.interop.ott.OTTGWBarycenterSolver` | Gromov–Wasserstein barycenter. |
+| `uot.interop.ott.OTTUnivariateSolver` | Closed-form 1D OT. |

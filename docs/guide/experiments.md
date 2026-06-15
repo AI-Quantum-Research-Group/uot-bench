@@ -31,7 +31,11 @@ from uot import Experiment, SolverConfig, run_pipeline
 from uot.solvers import SinkhornTwoMarginalSolver, LBFGSTwoMarginalSolver
 from uot.experiments.measurement import measure_time_and_output
 
-experiment = Experiment("comparison", measure_time_and_output)
+experiment = Experiment(
+    name="comparison",
+    solve_fn=measure_time_and_output,
+    # hooks=[MyPostSolveHook()],   # optional; see guide/hooks.md
+)
 
 solvers = [
     SolverConfig(
@@ -70,8 +74,15 @@ The `solve_fn` argument to `Experiment` must match the `SolveFn` Protocol:
 
 ```python
 class SolveFn(Protocol):
-    def __call__(self, prob, instance, marginals, costs, **kwargs) -> dict[str, Any]: ...
+    def __call__(self, prob, instance, view, **kwargs) -> dict[str, Any]: ...
 ```
+
+`view` is the prepared representation the runner builds before the timed solve.
+For the default `input_kind = "marginals_costs"` it is a `SolverInputs` dataclass
+(`view.marginals`, `view.costs`); other solver kinds receive a backend-specific
+pre-built problem object. The built-in measurement functions handle both via
+`uot.experiments.measurement.invoke_solver`, so you rarely touch `view` directly.
+See [Writing a custom Solver → Representation negotiation](custom-solver.md#representation-negotiation-input_kind).
 
 The built-in options are in `uot.experiments.measurement`:
 
@@ -97,6 +108,12 @@ Every row in the output `pd.DataFrame` is the union of:
 
 Failed solver calls produce a row with `status="failed"` and `exception=<message>`;
 all measurement columns are absent (NaN after concat).
+
+!!! note "Post-solve hooks can add or fan out rows"
+    If the `Experiment` (or the problem, via `Problem.post_solve_hooks()`) has
+    hooks, each successful solve may produce **more than one** row — e.g. the
+    colour-transfer hook emits one row per post-processing mode. Hooks can also
+    add extra metric columns. See [Post-solve hooks](hooks.md).
 
 ## YAML alternative
 
