@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, NotRequired, Required, TypedDict, cast
+from collections.abc import Mapping
+from typing import Any, Required, TypedDict, cast
 
 import jax
 
-if TYPE_CHECKING:
-    from gpu_tracker.tracker import Tracker
-
-from uot.data.measure import BaseMeasure
 from uot.problems.base_problem import Problem
 from uot.problems.protocols import HasExactCost
 from uot.solvers.base_solver import BaseSolver, SolverOutput
-from uot.utils.types import ArrayLike
 
 
 class MeasurementTime(TypedDict):
@@ -70,16 +65,31 @@ def _require(result: Mapping[str, Any], required: set[str]) -> None:
         raise RuntimeError(f"Solver returned no {missing!r} fields")
 
 
+def invoke_solver(instance: BaseSolver, view: Any, **kwargs: Any) -> SolverOutput:
+    """Call *instance*.solve with the correct convention for its ``input_kind``.
+
+    For the default ``"marginals_costs"`` kind, unpacks ``view.marginals`` and
+    ``view.costs`` as keyword arguments — preserving the existing native-solver
+    contract byte-for-byte.
+
+    For any other kind, passes *view* as the sole positional argument so that
+    solvers with pre-built backend representations can receive them directly.
+    """
+    kind = getattr(instance, "input_kind", "marginals_costs")
+    if kind == "marginals_costs":
+        return instance.solve(marginals=view.marginals, costs=view.costs, **kwargs)
+    return instance.solve(view, **kwargs)
+
+
 def measure_time(
     prob: Problem,
     instance: BaseSolver,
-    marginals: Sequence[BaseMeasure],
-    costs: Sequence[ArrayLike],
+    view: Any,
     **kwargs: Any,
 ) -> MeasurementTime:
     """Run *instance* and return ``{"time": ms}``."""
     start_time = time.perf_counter()
-    solution = instance.solve(marginals=marginals, costs=costs, **kwargs)
+    solution = invoke_solver(instance, view, **kwargs)
     _wait_jax_finish(solution)
     return {"time": (time.perf_counter() - start_time) * 1000}
 
@@ -87,13 +97,12 @@ def measure_time(
 def measure_time_and_output(
     prob: Problem,
     instance: BaseSolver,
-    marginals: Sequence[BaseMeasure],
-    costs: Sequence[ArrayLike],
+    view: Any,
     **kwargs: Any,
 ) -> MeasurementTimeAndOutput:
     """Run *instance* and return timing + all solver output fields."""
     start_time = time.perf_counter()
-    solution: SolverOutput = instance.solve(marginals=marginals, costs=costs, **kwargs)
+    solution: SolverOutput = invoke_solver(instance, view, **kwargs)
     _wait_jax_finish(solution)
     metrics: dict[str, Any] = {"time": (time.perf_counter() - start_time) * 1000}
     metrics.update(solution)
@@ -103,12 +112,11 @@ def measure_time_and_output(
 def measure_solution_precision(
     prob: Problem,
     instance: BaseSolver,
-    marginals: Sequence[BaseMeasure],
-    costs: Sequence[ArrayLike],
+    view: Any,
     **kwargs: Any,
 ) -> MeasurementPrecision:
     """Run *instance* and return relative cost error vs. exact solution."""
-    result: SolverOutput = instance.solve(marginals=marginals, costs=costs, **kwargs)
+    result: SolverOutput = invoke_solver(instance, view, **kwargs)
     _wait_jax_finish(result)
     _require(result, {"cost"})
     if not isinstance(prob, HasExactCost):
@@ -120,8 +128,7 @@ def measure_solution_precision(
 def measure_with_gpu_tracker(
     prob: Problem,
     instance: BaseSolver,
-    marginals: Sequence[BaseMeasure],
-    costs: Sequence[ArrayLike],
+    view: Any,
     **kwargs: Any,
 ) -> MeasurementGPU:
     """Run *instance* inside a GPU/CPU resource tracker and return detailed metrics."""
@@ -134,11 +141,12 @@ def measure_with_gpu_tracker(
         time_unit="seconds",
     ) as gt:
         start_time = time.perf_counter()
-        metrics: dict[str, Any] = cast(dict[str, Any], instance.solve(marginals=marginals, costs=costs, **kwargs))
+        metrics: dict[str, Any] = cast(dict[str, Any], invoke_solver(instance, view, **kwargs))
         _wait_jax_finish(metrics)
         finish_time = time.perf_counter()
 
         if instance.__class__.__name__ == "BackNForthSqEuclideanSolver":
+            marginals = view.marginals  # view is SolverInputs for marginals_costs kind
             axes_mu = marginals[0].as_grid(backend="jax", dtype=jnp.float64)[0]  # type: ignore[attr-defined]
             grids = jnp.meshgrid(*axes_mu, indexing="ij")
             X = jnp.stack(grids, axis=-1)

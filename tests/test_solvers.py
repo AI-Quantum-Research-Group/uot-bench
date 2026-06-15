@@ -197,8 +197,8 @@ def test_experiment_run_on_problems_accepts_c_transform_init_kwarg(monkeypatch):
     problem = TwoMarginalProblem("grid", mu, nu, cost_euclid_squared)
     experiment = Experiment(
         name="bfm",
-        solve_fn=lambda problem, solver, marginals, costs, **kwargs: solver.solve(
-            marginals=marginals, costs=costs, **kwargs
+        solve_fn=lambda problem, solver, view, **kwargs: solver.solve(
+            marginals=view.marginals, costs=view.costs, **kwargs
         ),
     )
 
