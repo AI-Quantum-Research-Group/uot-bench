@@ -40,7 +40,7 @@ if __name__ == "__main__":
         seed=43,
     )
 
-    experiment = Experiment("GaussianToy", solve_fn)
+    experiment = Experiment("GaussianToy", solve_fn)  # type: ignore[arg-type]
     sinkhorn_config = SolverConfig(
         name="Sinkhorn",
         solver=SinkhornTwoMarginalSolver(),
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     df = run_pipeline(
         experiment=experiment,
         solvers=[sinkhorn_config],
-        iterators=[gauss_gen1, gauss_gen2],
+        iterators=[gauss_gen1, gauss_gen2],  # type: ignore[arg-type]
         folds=10,
     )
 

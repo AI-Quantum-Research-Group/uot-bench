@@ -1,6 +1,7 @@
 import os
 import argparse
 import subprocess
+from typing import cast
 import pandas as pd
 
 parser = argparse.ArgumentParser(description="Visualize experiment results.")
@@ -21,7 +22,7 @@ args = parser.parse_args()
 results_dir = args.results_dir
 
 
-def parse_post_hoc_result(filename: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def parse_post_hoc_result(filename: str) -> tuple[pd.DataFrame, pd.Series]:  # type: ignore[type-arg]
     result = subprocess.run(['Rscript', 'uot/experiments/post_hoc_test.R', filename], capture_output=True, text=True)
     output = result.stdout
 
@@ -33,18 +34,18 @@ def parse_post_hoc_result(filename: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     
     pvalues = [row.split()[1:] for row in pvalues_part[1:]]
     pvalues = pd.DataFrame(columns=algorithms, index=algorithms, data=pvalues)
-    pvalues = pvalues.apply(pd.to_numeric, errors='coerce')
+    pvalues = cast(pd.DataFrame, pvalues.apply(pd.to_numeric, errors='coerce'))
 
     ranks_part = ranks_part.split('\n')[1:-1]
-    
+
     ranks_algorithms = [row.split()[0] for row in ranks_part]
-    ranks = [row.split()[1] for row in ranks_part]
-    ranks = pd.Series(index=ranks_algorithms, data=ranks)
+    ranks_data = [row.split()[1] for row in ranks_part]
+    ranks = pd.Series(index=ranks_algorithms, data=ranks_data)
 
     return pvalues, ranks
 
 
-def convert_to_latex_tables(pvalues: pd.DataFrame, ranks: pd.Series) -> None:
+def convert_to_latex_tables(pvalues: pd.DataFrame, ranks: pd.Series) -> tuple[str, str]:  # type: ignore[type-arg]
     table_code = pvalues.to_latex(column_format=f"|l|{'l'*len(pvalues)}|")
 
     table_code = r"\begin{tabular}{" + f"|l|{'l'*len(pvalues)}|" + '}\n'
@@ -57,8 +58,8 @@ def convert_to_latex_tables(pvalues: pd.DataFrame, ranks: pd.Series) -> None:
         table_code += ' & '.join(map(str, row_items)) + r'\\' + '\n'
 
     table_code += r'\hline\end{tabular}'
-    ranks = ranks.sort_values().to_frame("Rank")
-    return pvalues.to_latex(float_format="%.2e"), ranks.to_latex()
+    ranks_df = ranks.sort_values().to_frame("Rank")
+    return pvalues.to_latex(float_format="%.2e"), ranks_df.to_latex()  # type: ignore[return-value]
 
 
 result_files = [os.path.join(args.results_dir, file) for file in os.listdir(args.results_dir)]

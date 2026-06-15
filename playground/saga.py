@@ -9,7 +9,7 @@ from functools import partial
 import pandas as pd
 
 from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.utils.costs import cost_euclid_squared
 from uot.problems.generators import GaussianMixtureGenerator
 from uot.experiments.measurement import measure_with_gpu_tracker
@@ -126,7 +126,7 @@ class SAGASolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[jnp.ndarray],
         reg: float = 1e-3,
         maxiter: int = 1000,
@@ -134,7 +134,7 @@ class SAGASolver(BaseSolver):
         *args,
         **kwargs,
     ):
-        mu, nu = marginals[0].to_discrete()[1], marginals[1].to_discrete()[1]
+        mu, nu = marginals[0].as_point_cloud()[1], marginals[1].as_point_cloud()[1]
         C = costs[0]
         key = jax.random.PRNGKey(self._seed)
         P, phi, psi, cost, error, iters = _saga(

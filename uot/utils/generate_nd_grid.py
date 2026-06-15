@@ -44,7 +44,7 @@ def compute_axis_spacings(axes: list[ArrayLike], use_jax: bool = True) -> list[A
         if arr.ndim != 1:
             raise ValueError(f"Axis {i} must be 1-D, got shape {arr.shape}")
         if arr.size <= 1:
-            spacing = xp.asarray(1.0) if use_jax else 1.0
+            spacing: ArrayLike = xp.asarray(1.0) if use_jax else np.asarray(1.0)
         else:
             spacing = arr[1] - arr[0]
         spacings.append(spacing)

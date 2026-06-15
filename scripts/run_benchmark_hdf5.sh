@@ -48,6 +48,3 @@ python -m uot.experiments.synthetic.benchmark \
   --folds "$FOLDS" \
   --export "$RESULT_DIR/$(basename "$RUN_CFG" .yaml).csv"
 
-if type conda >/dev/null 2>&1; then
-  conda deactivate
-fi

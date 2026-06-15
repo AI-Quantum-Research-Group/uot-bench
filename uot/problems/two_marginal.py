@@ -1,7 +1,7 @@
 import ot
 from collections.abc import Callable
 from uot.data.measure import BaseMeasure
-from uot.problems.base_problem import MarginalProblem
+from uot.problems.base_problem import Problem as MarginalProblem
 from uot.utils.types import ArrayLike
 
 from uot.utils.logging import logger
@@ -34,8 +34,8 @@ class TwoMarginalProblem(MarginalProblem):
         calls do not recompute.
         """
         if self._C is None:
-            X, _ = self._mu.to_discrete()  # X: ArrayLike of shape (n, d)
-            Y, _ = self._nu.to_discrete()  # Y: ArrayLike of shape (m, d)
+            X, _ = self._mu.as_point_cloud()  # X: ArrayLike of shape (n, d)
+            Y, _ = self._nu.as_point_cloud()  # Y: ArrayLike of shape (m, d)
 
             C = self._cost_fn(X, Y)  # should return an (n × m) array
 
@@ -51,26 +51,28 @@ class TwoMarginalProblem(MarginalProblem):
         """
         if self._exact_cost is None:
             self._compute_exact_solution()
+        assert self._exact_cost is not None
         return self._exact_cost
 
-    def get_exact_coupling(self) -> float:
+    def get_exact_coupling(self) -> ArrayLike:
         """
-        Return exact map of transportation between measures
-        self._mu and self._nu, caching it in the self._exact_cost,
-        such that repeated calls do not recompute
+        Return exact transport plan between self._mu and self._nu,
+        caching it so repeated calls do not recompute.
         """
         if self._exact_coupling is None:
             self._compute_exact_solution()
+        assert self._exact_coupling is not None
         return self._exact_coupling
 
     def to_dict(self) -> dict:
-        mu_size = len(self._mu.to_discrete()[0])
-        nu_size = len(self._nu.to_discrete()[0])
+        mu_size = len(self._mu.as_point_cloud()[0])
+        nu_size = len(self._nu.as_point_cloud()[0])
         return {
             "dataset": self.name,
-            "mu_size": mu_size,
-            "nu_size": nu_size,
-            "cost": self._cost_fn.__name__,
+            "type": "two_marginal",
+            "n_mu": mu_size,
+            "n_nu": nu_size,
+            "cost": self.cost_name,
         }
 
     def _compute_exact_solution(self):
@@ -79,8 +81,8 @@ class TwoMarginalProblem(MarginalProblem):
         self._mu and self._nu and cache it in self._exact_cost and 
         self._exact_coupling
         """
-        a = self._mu.to_discrete()[1]
-        b = self._nu.to_discrete()[1]
+        a = self._mu.as_point_cloud()[1]
+        b = self._nu.as_point_cloud()[1]
         C = self.get_costs()[0]
 
         T, log = ot.emd(a, b, C, log=True, numItermax=10000000)
@@ -90,8 +92,5 @@ class TwoMarginalProblem(MarginalProblem):
         self._exact_coupling = T
         self._exact_cost = log['cost']
 
-    def free_memory(self):
-        # TODO: as mentioned in the abstract class, consider removing this
-        #       method, as we should move all the responsiblity of the memory
-        #       management on the GC
+    def free_memory(self) -> None:
         self._C = None

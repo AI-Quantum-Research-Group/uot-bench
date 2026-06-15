@@ -2,17 +2,17 @@ import pandas as pd
 from tqdm import tqdm
 from copy import deepcopy
 from itertools import chain
+from collections.abc import Iterable, Sequence
 from uot.solvers.solver_config import SolverConfig
 from uot.experiments.experiment import Experiment
-from uot.problems.base_problem import MarginalProblem
-from collections.abc import Iterable
+from uot.problems.base_problem import Problem
 from uot.utils.logging import logger
 
 
 def run_pipeline(
     experiment: Experiment,
-    solvers: list[SolverConfig],
-    iterators: list[Iterable[MarginalProblem]],
+    solvers: Sequence[SolverConfig],
+    iterators: Sequence[Iterable[Problem]],
     folds: int = 1,
     progress: bool = True,
 ) -> pd.DataFrame:
@@ -42,7 +42,7 @@ def run_pipeline(
     # are needed to run with different solver configuration
     current_iterators = deepcopy(all_iterators)
 
-    def progress_callback(n=1):
+    def progress_callback(n: int = 1) -> None:
         if pbar:
             pbar.update(n)
 

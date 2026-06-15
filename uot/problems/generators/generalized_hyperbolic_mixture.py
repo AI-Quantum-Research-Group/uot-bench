@@ -5,10 +5,12 @@ from scipy.stats import genhyperbolic
 
 from uot.utils.generate_nd_grid import generate_nd_grid, compute_cell_volume
 from uot.utils.generator_helpers import get_axes
-from uot.data.measure import DiscreteMeasure
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.problems.problem_generator import ProblemGenerator
 from uot.utils.build_measure import _build_measure
+from uot.utils.costs import cost_euclid_squared
+from uot.utils.types import ArrayLike
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 
 MEAN_FROM_BORDERS_COEF = 0.5
 VAR_LOWER = 0.05
@@ -29,14 +31,14 @@ class GeneralizedHyperbolicMixtureGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[np.ndarray, np.ndarray], np.ndarray],
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         seed: int = 42,
         lambda_bounds: tuple[float, float] = (-1.0, 2.0),
         alpha_bounds: tuple[float, float] = (0.5, 5.0),
         beta_coef: float = 0.9,
         delta_bounds: tuple[float, float] = (0.1, 2.0),
-        measure_mode: str = "grid",  # NEW: 'grid' | 'discrete' | 'auto'
-        cell_discretization: str = "cell-centered" # NEW: 'cell-centered' | 'vertex-centered'
+        measure_mode: str = "grid",
+        cell_discretization: CellDiscretization = "cell-centered",
     ):
         super().__init__()
         self._name = name
@@ -53,9 +55,9 @@ class GeneralizedHyperbolicMixtureGenerator(ProblemGenerator):
         self._beta_coef = beta_coef
         self._delta_bounds = delta_bounds
         self._measure_mode = measure_mode
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
 
-    def _sample_mixture_weights_and_pdfs(self, points: np.ndarray) -> np.ndarray:
+    def _sample_mixture_weights_and_pdfs(self, points: ArrayLike) -> np.ndarray:
         """Sample GH mixture parameters and return normalized pdf values on points."""
         # equal mixture weights
         mix_weights = np.ones(self._num_components) / self._num_components
@@ -74,10 +76,11 @@ class GeneralizedHyperbolicMixtureGenerator(ProblemGenerator):
             size=(self._num_components, self._dim),
         )
 
-        pdf_vals = np.zeros(points.shape[0])
+        points_arr = np.asarray(points)
+        pdf_vals = np.zeros(points_arr.shape[0])
         for i in range(self._num_components):
             # independent across dimensions
-            comp_pdf = np.ones(points.shape[0])
+            comp_pdf = np.ones(points_arr.shape[0])
             for d in range(self._dim):
                 rv = genhyperbolic(
                     p=lambdas[i],
@@ -86,7 +89,7 @@ class GeneralizedHyperbolicMixtureGenerator(ProblemGenerator):
                     loc=locs[i, d],
                     scale=deltas[i],
                 )
-                comp_pdf *= rv.pdf(points[:, d])
+                comp_pdf *= rv.pdf(points_arr[:, d])  # type: ignore[attr-defined]
             pdf_vals += mix_weights[i] * comp_pdf
 
         return pdf_vals / pdf_vals.sum()
@@ -114,8 +117,6 @@ class GeneralizedHyperbolicMixtureGenerator(ProblemGenerator):
             # sample independently for nu
             w_nu = _prepare(self._sample_mixture_weights_and_pdfs(points))
 
-            # mu_measure = DiscreteMeasure(points=points, weights=w_mu)
-            # nu_measure = DiscreteMeasure(points=points, weights=w_nu)
             mu = _build_measure(points, w_mu, axes, self._measure_mode, self._use_jax)
             nu = _build_measure(points, w_nu, axes, self._measure_mode, self._use_jax)
 

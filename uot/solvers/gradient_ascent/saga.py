@@ -5,20 +5,20 @@ import optax
 
 from collections.abc import Sequence
 from functools import partial
-from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
+from uot.data.measure import BaseMeasure, PointCloudMeasure
 
 
 @partial(jax.jit, static_argnums=(0, 5, 6))
 def _saga(
     self,
-    mu: jnp.ndarray,        # shape (n,)
-    nu: jnp.ndarray,        # shape (m,)
-    C: jnp.ndarray,         # shape (n, m)
+    mu: jax.Array,        # shape (n,)
+    nu: jax.Array,        # shape (m,)
+    C: jax.Array,         # shape (n, m)
     reg: float,
     maxiter: int,
     tol: float,
-    key: jnp.ndarray,       # PRNGKey
+    key: jax.Array,       # PRNGKey
 ):
     maxiter = int(maxiter)
     n, m = mu.shape[0], nu.shape[0]
@@ -111,17 +111,17 @@ class SAGASolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
-        costs: Sequence[jnp.ndarray],
+        marginals: Sequence[BaseMeasure],
+        costs: Sequence[jax.Array],
         reg: float = 1e-3,
         maxiter: int = 1000,
         tol: float = 1e-6,
         *args,
         **kwargs,
-    ):
+    ) -> SolverOutput:
         (mu, nu) = (
-            marginals[0].to_discrete(include_zeros=False)[1],
-            marginals[1].to_discrete(include_zeros=False)[1]
+            marginals[0].as_point_cloud(include_zeros=False)[1],
+            marginals[1].as_point_cloud(include_zeros=False)[1]
             )
         C = costs[0]
         key = jax.random.PRNGKey(self._seed)

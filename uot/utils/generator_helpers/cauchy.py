@@ -67,48 +67,35 @@ def get_cauchy_pdf(
 
     d = dim
 
-    if use_jax:
-        cov_inv = jnp.linalg.inv(cov)
+    cov_inv_j = jnp.linalg.inv(cov) if use_jax else jnp.zeros((d, d))
+    cov_inv_np = np.linalg.inv(cov) if not use_jax else np.zeros((d, d))
 
-        def pdf_fn(X: ArrayLike):
-            X = jnp.asarray(X)
-
-            if X.ndim != 2 or X.shape[1] != d:
+    def pdf_fn(X: ArrayLike):
+        if use_jax:
+            arr = jnp.asarray(X)
+            if arr.ndim != 2 or arr.shape[1] != d:
                 raise ValueError(f"Input to pdf_fn must be shape (N, {d}).")
-
-            diff = X - mean
-
-            qf = jnp.einsum("nd,de,ne->n", diff, cov_inv, diff)
-
+            diff = arr - mean
+            qf = jnp.einsum("nd,de,ne->n", diff, cov_inv_j, diff)
             numerator = gamma((d + 1) / 2)
             denominator = (
                 gamma(0.5) * (np.pi ** (d / 2)) *
                 (jnp.linalg.det(cov) ** 0.5) *
                 (1 + qf) ** ((d + 1) / 2)
             )
-
             return numerator / denominator
-
-    else:
-        cov_inv = np.linalg.inv(cov)
-
-        def pdf_fn(X: ArrayLike):
-            X = np.asarray(X)
-
-            if X.ndim != 2 or X.shape[1] != d:
+        else:
+            arr2 = np.asarray(X)
+            if arr2.ndim != 2 or arr2.shape[1] != d:
                 raise ValueError(f"Input to pdf_fn must be shape (N, {d}).")
-
-            diff = X - mean
-
-            qf = np.einsum("nd,de,ne->n", diff, cov_inv, diff)
-
+            diff2 = arr2 - mean
+            qf2 = np.einsum("nd,de,ne->n", diff2, cov_inv_np, diff2)
             numerator = gamma((d + 1) / 2)
             denominator = (
                 gamma(0.5) * (np.pi ** (d / 2)) *
                 (np.linalg.det(cov) ** 0.5) *
-                (1 + qf) ** ((d + 1) / 2)
+                (1 + qf2) ** ((d + 1) / 2)
             )
-
             return numerator / denominator
 
     return pdf_fn

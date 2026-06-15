@@ -127,6 +127,7 @@ def compose_monge_map_nd(T: jnp.ndarray,
         raise ValueError("Pass exactly one of {psi, F}.")
 
     if F is None:
+        assert psi is not None, "psi must be provided when F is None"
         F = monge_field_from_psi_nd(psi)
 
     # Sanity: T and F must share the same spatial shape

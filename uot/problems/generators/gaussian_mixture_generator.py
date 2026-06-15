@@ -1,16 +1,20 @@
+from typing import cast
 import numpy as np
 from uot.utils.types import ArrayLike
 from uot.problems.problem_generator import ProblemGenerator
 from uot.utils.generate_nd_grid import generate_nd_grid, compute_cell_volume
 from uot.utils.generator_helpers import (
     get_gmm_pdf as get_gmm_pdf_jax,
+    build_gmm_pdf,
     build_gmm_pdf_scipy,
+    generate_gmm_coefficients,
     sample_gmm_params_wishart
 )
 from uot.utils.build_measure import _build_measure
+from uot.utils.costs import cost_euclid_squared
 from uot.utils.generator_helpers import get_axes
+from uot.utils.generator_helpers.get_axes import CellDiscretization
 from uot.problems.two_marginal import TwoMarginalProblem
-from uot.data.measure import DiscreteMeasure
 from collections.abc import Callable, Iterator
 import jax
 import jax.numpy as jnp
@@ -75,7 +79,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
     borders:
         Tuple (b0, b1) defining the (shared) domain bounds on each axis.
     cost_fn:
-        Callable cost function c(x, y) used by TwoMarginalProblem.
+        Callable cost function c(x, y) used by TwoMarginalProblem. Defaults to
+        squared Euclidean distance.
     use_jax:
         If True, use JAX sampling/pdf evaluation; otherwise use NumPy/SciPy.
     seed:
@@ -94,7 +99,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
         These bounds control the typical component scale via covariance re-scaling.
     measure_mode:
         Measure construction mode passed to `_build_measure`:
-        typically 'grid', 'discrete', or 'auto' (project-specific semantics).
+        typically 'grid', 'point_cloud', or 'auto' (project-specific semantics).
     cell_discretization:
         Grid discretization convention: 'cell-centered' or 'vertex-centered'.
         For 'cell-centered', weights are multiplied by cell volume to approximate
@@ -121,7 +126,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
         n_points: int,
         num_datasets: int,
         borders: tuple[float, float],
-        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike],
+        cost_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = cost_euclid_squared,
         use_jax: bool = True,
         seed: int = 42,
         wishart_df: int | None = None,
@@ -129,8 +134,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
         mean_from_borders_coef: float = MEAN_FROM_BORDERS_COEF,
         variance_lower_bound_coef: float = VARIANCE_LOWER_BOUND_COEF,
         variance_upper_bound_coef: float = VARIANCE_UPPER_BOUND_COEF,
-        measure_mode: str = "grid",  # NEW: 'grid' | 'discrete' | 'auto'
-        cell_discretization: str = "cell-centered" # NEW: 'cell-centered' | 'vertex-centered'
+        measure_mode: str = "grid",
+        cell_discretization: CellDiscretization = "cell-centered",
     ):
         super().__init__()
         # TODO: arbitrary dim?
@@ -157,16 +162,30 @@ class GaussianMixtureGenerator(ProblemGenerator):
             self._key = jax.random.PRNGKey(seed)
         else:
             self._rng = np.random.default_rng(seed)
-        self.cell_discretization = cell_discretization
+        self.cell_discretization: CellDiscretization = cell_discretization
 
     def _sample_weights_jax(
         self,
         mean_bounds: tuple[float, float],
         variance_bounds: tuple[float, float],
-    ) -> jnp.ndarray:
+        return_params: bool = False,
+    ) -> jnp.ndarray | tuple[jnp.ndarray, tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]]:
         """
         Sample GMM, evaluate PDF on grid, and normalize weights (JAX).
         """
+        if return_params:
+            self._key, means, covs = generate_gmm_coefficients(
+                key=self._key,
+                dim=self._dim,
+                num_components=self._num_components,
+                mean_bounds=mean_bounds,
+                variance_bounds=variance_bounds,
+            )
+            weights = jnp.ones((self._num_components,)) / self._num_components
+            pdf = build_gmm_pdf(means, covs, weights)
+            w = pdf(jnp.asarray(self._points))
+            return w / jnp.sum(w), (means, covs, weights)
+
         pdf, self._key = get_gmm_pdf_jax(
             key=self._key,
             dim=self._dim,
@@ -174,7 +193,7 @@ class GaussianMixtureGenerator(ProblemGenerator):
             mean_bounds=mean_bounds,
             variance_bounds=variance_bounds,
         )
-        w = pdf(self._points)
+        w = pdf(jnp.asarray(self._points))
         return w / jnp.sum(w)
 
     def _rescale_covariances(
@@ -203,7 +222,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
         self,
         mean_bounds: tuple[float, float],
         variance_bounds: tuple[float, float],
-    ) -> np.ndarray:
+        return_params: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray]]:
         """
         Sample GMM parameters using Wishart-based covariances, evaluate PDF, and normalize weights (NumPy/SciPy).
         """
@@ -218,7 +238,137 @@ class GaussianMixtureGenerator(ProblemGenerator):
         covs_arr = self._rescale_covariances(covs_arr, variance_bounds)
         pdf = build_gmm_pdf_scipy(means_arr, covs_arr, weights)
         w = pdf(np.asarray(self._points))
+        if return_params:
+            return w / np.sum(w), (means_arr, covs_arr, weights)
         return w / np.sum(w)
+
+    @staticmethod
+    def _spd_sqrtm(mat, *, xp, eps: float = 1e-12):
+        vals, vecs = xp.linalg.eigh(mat)
+        vals = xp.clip(vals, eps, None)
+        return (vecs * xp.sqrt(vals)) @ vecs.T
+
+    @staticmethod
+    def _spd_invsqrtm(mat, *, xp, eps: float = 1e-12):
+        vals, vecs = xp.linalg.eigh(mat)
+        vals = xp.clip(vals, eps, None)
+        return (vecs * (1.0 / xp.sqrt(vals))) @ vecs.T
+
+    @staticmethod
+    def _spd_inv(mat, *, xp, eps: float = 1e-12):
+        vals, vecs = xp.linalg.eigh(mat)
+        vals = xp.clip(vals, eps, None)
+        return (vecs * (1.0 / vals)) @ vecs.T
+
+    def _gaussian_affine_map(
+        self,
+        mean_src,
+        cov_src,
+        mean_tgt,
+        cov_tgt,
+        *,
+        xp,
+    ):
+        cov_src = xp.asarray(cov_src)
+        cov_tgt = xp.asarray(cov_tgt)
+        mean_src = xp.asarray(mean_src)
+        mean_tgt = xp.asarray(mean_tgt)
+
+        cov_src_sqrt = self._spd_sqrtm(cov_src, xp=xp)
+        cov_src_invsqrt = self._spd_invsqrtm(cov_src, xp=xp)
+        inner = cov_src_sqrt @ cov_tgt @ cov_src_sqrt
+        inner_sqrt = self._spd_sqrtm(inner, xp=xp)
+        A = cov_src_invsqrt @ inner_sqrt @ cov_src_invsqrt
+        A = 0.5 * (A + A.T)
+        b = mean_tgt - A @ mean_src
+        return A, b
+
+    def analytic_solution_from_params(
+        self,
+        *,
+        mu_params: tuple[ArrayLike, ArrayLike, ArrayLike],
+        nu_params: tuple[ArrayLike, ArrayLike, ArrayLike],
+        axes: list[ArrayLike] | None = None,
+        points: ArrayLike | None = None,
+    ) -> dict:
+        """
+        Analytic OT solution for two single-Gaussian marginals under quadratic cost.
+
+        Returns Kantorovich potentials (phi, psi) and Monge maps. Here:
+          - psi is the source potential on the mu-grid (used for pushforward).
+          - phi is the target potential on the nu-grid.
+        """
+        if self._num_components != 1:
+            raise ValueError("Analytic Gaussian solution requires num_components == 1.")
+
+        if points is None:
+            if axes is None:
+                raise ValueError("Provide axes or points to evaluate potentials.")
+            points = generate_nd_grid(axes, use_jax=self._use_jax)
+
+        xp = jnp if self._use_jax else np
+
+        mu_means, mu_covs, _ = mu_params
+        nu_means, nu_covs, _ = nu_params
+        mean_mu = xp.asarray(mu_means[0])
+        cov_mu = xp.asarray(mu_covs[0])
+        mean_nu = xp.asarray(nu_means[0])
+        cov_nu = xp.asarray(nu_covs[0])
+
+        A, b = self._gaussian_affine_map(
+            mean_src=mean_mu,
+            cov_src=cov_mu,
+            mean_tgt=mean_nu,
+            cov_tgt=cov_nu,
+            xp=xp,
+        )
+
+        X = xp.asarray(points)
+
+        xAx = xp.sum((X @ A) * X, axis=1)
+        u = 0.5 * xAx + X @ b
+        psi_source = 0.5 * xp.sum(X * X, axis=1) - u
+
+        A_inv = self._spd_inv(A, xp=xp)
+        y_shift = X - b
+        yAinv = y_shift @ A_inv
+        u_star = 0.5 * xp.sum(yAinv * y_shift, axis=1)
+        phi_target = 0.5 * xp.sum(X * X, axis=1) - u_star
+
+        T_phys = (X - mean_mu) @ A.T + mean_nu
+
+        solution = {
+            "phi": phi_target,
+            "psi": psi_source,
+            "u_final": phi_target,
+            "v_final": psi_source,
+            "monge_map_physical": T_phys,
+            "affine_map": {
+                "A": A,
+                "b": b,
+                "mean_mu": mean_mu,
+                "cov_mu": cov_mu,
+                "mean_nu": mean_nu,
+                "cov_nu": cov_nu,
+            },
+        }
+
+        if axes is not None:
+            shape = tuple(ax.shape[0] for ax in axes)
+            solution["phi"] = phi_target.reshape(shape)
+            solution["psi"] = psi_source.reshape(shape)
+            solution["u_final"] = solution["phi"]
+            solution["v_final"] = solution["psi"]
+            solution["monge_map_physical"] = T_phys.reshape(shape + (self._dim,))
+
+            spacings = xp.asarray(
+                [ax[1] - ax[0] if ax.shape[0] > 1 else 1.0 for ax in axes]
+            )
+            origins = xp.asarray([ax[0] for ax in axes])
+            T_index = (T_phys - origins) / spacings
+            solution["monge_map_index"] = T_index.reshape(shape + (self._dim,))
+
+        return solution
 
     def generate(self) -> Iterator[TwoMarginalProblem]:
         axes = get_axes(
@@ -249,8 +399,8 @@ class GaussianMixtureGenerator(ProblemGenerator):
         )
 
         for _ in range(self._num_datasets):
-            w_mu = sampler(mean_bounds, variance_bounds)
-            w_nu = sampler(mean_bounds, variance_bounds)
+            w_mu = cast(jnp.ndarray, sampler(mean_bounds, variance_bounds))
+            w_nu = cast(jnp.ndarray, sampler(mean_bounds, variance_bounds))
 
             if self.cell_discretization == "cell-centered":
                 w_mu = w_mu * cell_volume
@@ -268,3 +418,63 @@ class GaussianMixtureGenerator(ProblemGenerator):
                 nu=nu,
                 cost_fn=self._cost_fn,
             )
+
+    def generate_with_analytic_solution(self) -> Iterator[tuple[TwoMarginalProblem, dict]]:
+        """
+        Generate problems together with analytic Gaussian OT solutions.
+
+        Only valid when num_components == 1.
+        """
+        if self._num_components != 1:
+            raise ValueError("Analytic Gaussian solution requires num_components == 1.")
+
+        axes = get_axes(
+            self._dim,
+            self._borders,
+            self._n_points,
+            cell_discretization=self.cell_discretization,
+            use_jax=self._use_jax,
+        )
+        self._points = generate_nd_grid(axes, use_jax=self._use_jax)
+        cell_volume = compute_cell_volume(axes, use_jax=self._use_jax)
+
+        mean_bounds = (
+            self._borders[0]
+            + (self._borders[1] - self._borders[0]) * self._mean_from_borders_coef,
+            self._borders[1]
+            - (self._borders[1] - self._borders[0]) * self._mean_from_borders_coef,
+        )
+        variance_bounds = (
+            abs(self._borders[1]) * self._variance_lower_bound_coef,
+            abs(self._borders[1]) * self._variance_upper_bound_coef,
+        )
+
+        sampler = self._sample_weights_jax if self._use_jax else self._sample_weights_np
+
+        for _ in range(self._num_datasets):
+            w_mu, mu_params = sampler(mean_bounds, variance_bounds, return_params=True)
+            w_nu, nu_params = sampler(mean_bounds, variance_bounds, return_params=True)
+
+            if self.cell_discretization == "cell-centered":
+                w_mu = w_mu * cell_volume
+                w_nu = w_nu * cell_volume
+
+            w_mu = w_mu / w_mu.sum()
+            w_nu = w_nu / w_nu.sum()
+
+            mu = _build_measure(self._points, w_mu, axes, self._measure_mode, self._use_jax)
+            nu = _build_measure(self._points, w_nu, axes, self._measure_mode, self._use_jax)
+
+            problem = TwoMarginalProblem(
+                name=self._name,
+                mu=mu,
+                nu=nu,
+                cost_fn=self._cost_fn,
+            )
+            analytic = self.analytic_solution_from_params(
+                mu_params=mu_params,
+                nu_params=nu_params,
+                axes=axes,
+                points=self._points,
+            )
+            yield problem, analytic

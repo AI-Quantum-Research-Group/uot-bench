@@ -1,14 +1,13 @@
 from collections.abc import Sequence
 from functools import partial
-from typing import Tuple
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 import optax
 
-from uot.data.measure import DiscreteMeasure
-from uot.solvers.base_solver import BaseSolver
+from uot.data.measure import BaseMeasure, PointCloudMeasure
+from uot.solvers.base_solver import BaseSolver, SolverOutput
 from uot.utils.types import ArrayLike
 from uot.solvers.gradient_ascent._make_schedule import _make_schedule
 
@@ -34,7 +33,7 @@ class AMSGradSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],   # [mu, nu]
+        marginals: Sequence[BaseMeasure],   # [mu, nu]
         costs: Sequence[ArrayLike],            # [C]
         reg: float,
         maxiter: int,
@@ -42,10 +41,10 @@ class AMSGradSolver(BaseSolver):
         *args,
         normalize_cost: bool = True,
         **kwargs,
-    ) -> dict:
+    ) -> SolverOutput:
         # --- extract & normalize marginals (stable) ---
-        a = jnp.asarray(marginals[0].to_discrete()[1])
-        b = jnp.asarray(marginals[1].to_discrete()[1])
+        a = jnp.asarray(marginals[0].as_point_cloud()[1])
+        b = jnp.asarray(marginals[1].as_point_cloud()[1])
         a = jnp.clip(a / jnp.sum(a), a_min=1e-10)
         b = jnp.clip(b / jnp.sum(b), a_min=1e-10)
 
@@ -55,6 +54,7 @@ class AMSGradSolver(BaseSolver):
             raise ValueError(f"Cost shape {C.shape} incompatible with marginals {(a.shape[0], b.shape[0])}.")
 
         # --- optional cost normalization ---
+        scaling: jax.Array = jnp.ones(())
         if normalize_cost:
             scaling = jnp.max(jnp.abs(C))
             scaling = jnp.where(scaling > 0, scaling, 1.0)
@@ -98,7 +98,7 @@ class AMSGradSolver(BaseSolver):
 
 # -------------------- JIT core (2-marginal) --------------------
 
-def _logsumexp(x: jnp.ndarray, axis=None, keepdims=False) -> jnp.ndarray:
+def _logsumexp(x: jax.Array, axis=None, keepdims=False) -> jax.Array:
     m = jnp.max(x, axis=axis, keepdims=True)
     lse = m + jnp.log(jnp.sum(jnp.exp(x - m), axis=axis, keepdims=True) + 1e-12)
     if not keepdims and axis is not None:
@@ -108,9 +108,9 @@ def _logsumexp(x: jnp.ndarray, axis=None, keepdims=False) -> jnp.ndarray:
 @partial(jax.jit, static_argnames=("maxiter", "tol", "optimizer", "schedule"))
 def _ga_amsgrad_2d(
     *,
-    a: jnp.ndarray,                  # (n,)
-    b: jnp.ndarray,                  # (m,)
-    C: jnp.ndarray,                  # (n, m)
+    a: jax.Array,                  # (n,)
+    b: jax.Array,                  # (m,)
+    C: jax.Array,                  # (n, m)
     eps: float,                      # entropic reg
     maxiter: int,
     tol: float,
@@ -151,18 +151,12 @@ def _ga_amsgrad_2d(
         updates = jax.tree.map(lambda g: g * step_lr, updates)
 
         # update potentials
-        u, v = optax.apply_updates((u, v), updates)
-
-        # gauge centering (mean-zero sum across both potentials)
-        # mu, mv = jnp.mean(u), jnp.mean(v)
-        # mbar = 0.5 * (mu + mv)
-        # u = u - (mu - mbar)
-        # v = v - (mv - mbar)
+        u, v = optax.apply_updates((u, v), updates)  # type: ignore[misc]
 
         # recompute residual with updated (u, v)
-        log_K2 = (u[:, None] + v[None, :] - C) / eps
-        row_err = jnp.linalg.norm(jnp.exp(_logsumexp(log_K2, axis=1)) - a, ord=2)
-        col_err = jnp.linalg.norm(jnp.exp(_logsumexp(log_K2, axis=0)) - b, ord=2)
+        log_K2 = (u[:, None] + v[None, :] - C) / eps  # type: ignore[operator]
+        row_err = jnp.linalg.norm(jnp.exp(_logsumexp(jnp.asarray(log_K2), axis=1)) - a, ord=2)
+        col_err = jnp.linalg.norm(jnp.exp(_logsumexp(jnp.asarray(log_K2), axis=0)) - b, ord=2)
         err = jnp.maximum(row_err, col_err)
 
         return (i + 1, u, v, opt_state, err)
@@ -172,7 +166,7 @@ def _ga_amsgrad_2d(
     )
 
     # final plan & cost
-    log_K_final = (u_fin[:, None] + v_fin[None, :] - C) / eps
+    log_K_final = (u_fin[:, None] + v_fin[None, :] - C) / eps  # type: ignore[operator]
     P_final = jnp.exp(log_K_final)
     cost = jnp.sum(P_final * C)
 
@@ -190,7 +184,7 @@ def _ga_amsgrad_2d(
 # from jax import lax
 # import optax
 
-# from uot.data.measure import DiscreteMeasure
+# from uot.data.measure import PointCloudMeasure
 # from uot.solvers.base_solver import BaseSolver
 # from uot.utils.types import ArrayLike
 # from uot.solvers.gradient_ascent._make_schedule import _make_schedule
@@ -222,7 +216,7 @@ def _ga_amsgrad_2d(
 
 #     def solve(
 #         self,
-#         marginals: Sequence[DiscreteMeasure],
+#         marginals: Sequence[PointCloudMeasure],
 #         costs: Sequence[ArrayLike],
 #         reg: float,
 #         maxiter: int,
@@ -233,7 +227,7 @@ def _ga_amsgrad_2d(
 #         **kwargs,
 #     ) -> dict:
 #         # Extract weights only (locations are irrelevant for the dual)
-#         a_list: List[jnp.ndarray] = [jnp.asarray(m.to_discrete()[1]) for m in marginals]
+#         a_list: List[jax.Array] = [jnp.asarray(m.to_discrete()[1]) for m in marginals]
 #         N = len(a_list)
 #         if N < 1 or N > 3:
 #             raise ValueError(f"This implementation supports 1 to 3 marginals, got N={N}.")
@@ -285,13 +279,13 @@ def _ga_amsgrad_2d(
 # def _axes_except(i: int, N: int) -> Tuple[int, ...]:
 #     return tuple(ax for ax in range(N) if ax != i)
 
-# def _reshape_for_axis(u: jnp.ndarray, axis: int, N: int) -> jnp.ndarray:
+# def _reshape_for_axis(u: jax.Array, axis: int, N: int) -> jax.Array:
 #     # reshape 1D potential u (len ni) into shape (1,..,1, ni, 1,..,1) with ni at "axis"
 #     shape = [1] * N
 #     shape[axis] = u.shape[0]
 #     return u.reshape(shape)
 
-# def _logsumexp_over_axes(x: jnp.ndarray, axes: Tuple[int, ...]) -> jnp.ndarray:
+# def _logsumexp_over_axes(x: jax.Array, axes: Tuple[int, ...]) -> jax.Array:
 #     # Stable log-sum-exp over multiple axes
 #     if len(axes) == 0:
 #         return x  # nothing to reduce
@@ -302,7 +296,7 @@ def _ga_amsgrad_2d(
 #         lse = jnp.squeeze(lse, axis=ax)
 #     return lse
 
-# def _center_gauge_multi(us: Tuple[jnp.ndarray, ...]) -> Tuple[jnp.ndarray, ...]:
+# def _center_gauge_multi(us: Tuple[jax.Array, ...]) -> Tuple[jax.Array, ...]:
 #     """
 #     Center the gauge across N marginals: shift each u_i by (mean(u_i) - average_of_means),
 #     so that the total sum of shifts is zero (keeps sum_i u_i unchanged).
@@ -316,8 +310,8 @@ def _ga_amsgrad_2d(
 # # ---------- residual & objective (log-domain, multi-marginal) ----------
 
 # def _mm_marginal_sums_from_potentials(
-#     us: Tuple[jnp.ndarray, ...], C: jnp.ndarray, eps: float
-# ) -> Tuple[Tuple[jnp.ndarray, ...], jnp.ndarray]:
+#     us: Tuple[jax.Array, ...], C: jax.Array, eps: float
+# ) -> Tuple[Tuple[jax.Array, ...], jax.Array]:
 #     """
 #     Given potentials (u1,...,uN), compute for each i the marginal sum along all other axes:
 #        m_i[x_i] = sum_{x_{-i}} exp((sum_k u_k[x_k] - C[x_1,...,x_N]) / eps)
@@ -338,8 +332,8 @@ def _ga_amsgrad_2d(
 #     return tuple(marg_sums), log_K
 
 # def _mm_residual_l2(
-#     marg_sums: Tuple[jnp.ndarray, ...], a_list: Tuple[jnp.ndarray, ...]
-# ) -> jnp.ndarray:
+#     marg_sums: Tuple[jax.Array, ...], a_list: Tuple[jax.Array, ...]
+# ) -> jax.Array:
 #     # L2 residual per marginal; return the max over marginals
 #     errs = [jnp.linalg.norm(ms - a, ord=2) for ms, a in zip(marg_sums, a_list)]
 #     return jnp.max(jnp.stack(errs))
@@ -349,8 +343,8 @@ def _ga_amsgrad_2d(
 
 # @partial(jax.jit, static_argnames=("maxiter", "tol", "optimizer", "schedule"))
 # def _mm_gradient_amsgrad(
-#     a_list: Tuple[jnp.ndarray, ...],
-#     C: jnp.ndarray,
+#     a_list: Tuple[jax.Array, ...],
+#     C: jax.Array,
 #     eps: float,
 #     *,
 #     maxiter: int,
@@ -365,7 +359,7 @@ def _ga_amsgrad_2d(
 #       plan (exp log_K), cost, tuple(potentials), iterations, final_residual
 #     """
 #     # Convert to tuple for PyTree-friendliness
-#     a_tuple: Tuple[jnp.ndarray, ...] = tuple(a_list)
+#     a_tuple: Tuple[jax.Array, ...] = tuple(a_list)
 #     N = len(a_tuple)
 
 #     # initialize potentials u_i (each shape (n_i,))

@@ -16,7 +16,7 @@ from sklearn.metrics import accuracy_score
 import argparse
 
 
-def get_solver_files(solvers: list[SolverConfig], costs_dir: str)-> list[str]:
+def get_solver_files(solvers: list[SolverConfig], costs_dir: str) -> list[tuple[SolverConfig, dict, str]]:
     """
     Extract solver file names from the list of SolverConfig objects.
     """
@@ -58,14 +58,14 @@ def load_pairwise_distances(solvers: list[SolverConfig], costs_dir: str)-> dict:
     return pairwise_distances
 
 
-def create_kernel_matrix(distance_matrix: np.ndarray)-> np.ndarray:
+def create_kernel_matrix(distance_matrix: ArrayLike) -> np.ndarray:
     """Convert distance matrix to a proper kernel matrix"""
 
-    kernel_matrix = np.exp(-distance_matrix)
+    kernel_matrix = np.exp(-np.asarray(distance_matrix))
     return kernel_matrix
 
 
-def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: ArrayLike, rng_seed: int)-> float:
+def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: ArrayLike, rng_seed: int = 42) -> float:
     """Calculate classification results using proper cross-validation with precomputed kernel"""
     X_sub = X[indices]
     y_sub = y[indices]
@@ -91,11 +91,10 @@ def calculate_results(X: ArrayLike, y: ArrayLike, distance: ArrayLike, indices: 
         fold_score = accuracy_score(y_test, y_pred)
         scores.append(fold_score)
     
-    return np.mean(scores)
+    return float(np.mean(scores))
 
 
-if __name__ == "__main__":
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Run MNIST classification using precomputed OT distance matrices")
 
     parser.add_argument(
@@ -111,12 +110,12 @@ if __name__ == "__main__":
 
     with open(args.config) as file:
         config = yaml.safe_load(file)
-    
+
     rng_seed = config.get('rng-seed', 42)
 
     solver_configs = load_solvers(config=config)
 
-    try: 
+    try:
         costs_dir = config['costs-dir']
         export_folder = config['output-dir']
     except KeyError as e:
@@ -124,7 +123,7 @@ if __name__ == "__main__":
         raise ValueError(f"Configuration file must contain '{e.args[0]}' key.")
 
     pairwise_distances = load_pairwise_distances(solver_configs, costs_dir)
-    
+
     results = []
     for sample_size in config['sample-sizes']:
 
@@ -156,9 +155,13 @@ if __name__ == "__main__":
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = f"mnist_results_{timestamp}.csv"
-    
-    results = pd.DataFrame(results)
+
+    results_df = pd.DataFrame(results)
     output_path = os.path.join(export_folder, output_file)
-    results.to_csv(output_path, index=False)
+    results_df.to_csv(output_path, index=False)
 
     logger.info(f"Results saved to {output_path}")
+
+
+if __name__ == "__main__":
+    main()

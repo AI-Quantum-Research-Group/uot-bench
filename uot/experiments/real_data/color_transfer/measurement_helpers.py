@@ -227,7 +227,7 @@ def _soft_extend_map(map_array, mask, axes, sigma: float | None = None):
                 axis_scales.append((ax[-1] - ax[0]) / (ax.shape[0] - 1))
             else:
                 axis_scales.append(1.0)
-        sigma = np.mean(axis_scales) if axis_scales else 0.1
+        sigma = float(np.mean(axis_scales)) if axis_scales else 0.1
         sigma = max(sigma * 0.5, 1e-3)
 
     diff = missing_coords[:, None, :] - known_coords[None, :, :]

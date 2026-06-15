@@ -2,7 +2,7 @@ import os
 import jax
 jax.config.update("jax_enable_x64", True)
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.utils.mnist_helpers import load_mnist_data
 from uot.utils.yaml_helpers import load_solvers
 from uot.utils.logging import logger
@@ -37,8 +37,8 @@ def compute_distances_np(X: ArrayLike,
 
     for i, j in args_list:
 
-        nu = DiscreteMeasure(weights=X[i], points=supp)
-        mu = DiscreteMeasure(weights=X[j], points=supp)
+        nu = PointCloudMeasure(weights=X[i], points=supp)
+        mu = PointCloudMeasure(weights=X[j], points=supp)
 
         res = solver_fn([nu, mu], [C], **param_kwargs)
 
@@ -61,7 +61,7 @@ def compute_distances_np(X: ArrayLike,
 def compute_distances_jax(X: jnp.ndarray,
                           C: jnp.ndarray,
                           name: str,
-                          solver_fn: callable,
+                          solver_fn,
                           param_kwargs: dict,
                           export_folder: str,
                           batch_size: int = 10000):
@@ -71,8 +71,8 @@ def compute_distances_jax(X: jnp.ndarray,
     pairs = jnp.array([[i, j] for i in range(n) for j in range(i + 1, n)], dtype=jnp.int32)
 
     def solve_single(w1, w2):
-        nu = DiscreteMeasure(weights=w1, points=supp)
-        mu = DiscreteMeasure(weights=w2, points=supp)
+        nu = PointCloudMeasure(weights=w1, points=supp)
+        mu = PointCloudMeasure(weights=w2, points=supp)
         res = solver_fn([nu, mu], [C], **param_kwargs)
         return jnp.sum(res['transport_plan'] * C)
 
@@ -132,16 +132,15 @@ def compute_distances_for_all_solvers(X: ArrayLike,
 
             if not solver.is_jit:
 
-                compute_distances_np(X, C, solver.name, solver.solver().solve, param_kwargs, export_folder)
-            
+                compute_distances_np(X, C, solver.name, solver.solver.solve, param_kwargs, export_folder)  # type: ignore[operator]
+
             else:
-                compute_distances_jax(X_jax, C_jax, solver.name, solver.solver().solve, param_kwargs, export_folder, batch_size)
+                compute_distances_jax(X_jax, C_jax, solver.name, solver.solver.solve, param_kwargs, export_folder, batch_size)  # type: ignore[operator]
 
     logger.info("All pairwise distances computed successfully.")
 
 
-if __name__ == "__main__":    
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Compute pairwise distances using specified solvers.")
 
     parser.add_argument(
@@ -152,7 +151,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    
+
     with open(args.config) as file:
         config = yaml.safe_load(file)
 
@@ -168,3 +167,7 @@ if __name__ == "__main__":
         raise ValueError("Configuration file must contain 'output-dir' key.")
 
     compute_distances_for_all_solvers(X, C, solver_configs, batch_size=batch_size, export_folder=export_folder)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,32 +1,31 @@
+import math
 import jax
 import jax.numpy as jnp
-import numpy as np
-from typing import Tuple, Optional
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from .sinkhorn_log import SinkhornTwoMarginalLogJaxSolver
 
 # ---------- helpers ----------
 
-def _normalize_weights(w: jnp.ndarray, eps: float = 1e-12) -> jnp.ndarray:
+def _normalize_weights(w: jax.Array, eps: float = 1e-12) -> jax.Array:
     w = jnp.asarray(w, dtype=jnp.float64)
     w = jnp.clip(w, eps, jnp.inf)
     return w / w.sum()
 
-def _to_discrete_normalized(measure) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    """Works for DiscreteMeasure (points, weights) or GridMeasure via .to_discrete()."""
-    if hasattr(measure, "to_discrete"):
-        X, w = measure.to_discrete(include_zeros=False)
+def _to_discrete_normalized(measure) -> tuple[jax.Array, jax.Array]:
+    """Works for PointCloudMeasure or GridMeasure via `.as_point_cloud()`."""
+    if hasattr(measure, "as_point_cloud"):
+        X, w = measure.as_point_cloud(include_zeros=False)
     else:
-        # assume DiscreteMeasure-like (points, weights) attributes
+        # assume point-cloud-like (points, weights) attributes
         X, w = measure.points, measure.weights
     X = jnp.asarray(X, dtype=jnp.float32)
     w = _normalize_weights(jnp.asarray(w))
     return X, w
 
-def _cost_matrix_sqeuclidean(X: jnp.ndarray, Y: jnp.ndarray,
-                             batch_size: Optional[int] = None,
-                             dtype=jnp.float32) -> jnp.ndarray:
+def _cost_matrix_sqeuclidean(X: jax.Array, Y: jax.Array,
+                             batch_size: int | None = None,
+                             dtype=jnp.float32) -> jax.Array:
     """
     Build full C = ||x - y||^2. You can set batch_size to limit peak memory.
     Your solver expects a dense array (it renormalizes internally).
@@ -52,18 +51,18 @@ def _cost_matrix_sqeuclidean(X: jnp.ndarray, Y: jnp.ndarray,
         return jnp.concatenate(rows, axis=0)
 
 def _ot_eps_cost(solver: "SinkhornTwoMarginalLogJaxSolver",
-                 X: jnp.ndarray, wX: jnp.ndarray,
-                 Y: jnp.ndarray, wY: jnp.ndarray,
+                 X: jax.Array, wX: jax.Array,
+                 Y: jax.Array, wY: jax.Array,
                  reg: float, maxiter: int, tol: float,
-                 batch_size: Optional[int]) -> float:
+                 batch_size: int | None) -> float:
     """
     Compute OT_ε(X,Y) using your solver. Returns the 'cost' field (un-normalized units).
     """
     # Build cost matrix (your solver divides by its max internally)
     C = _cost_matrix_sqeuclidean(X, Y, batch_size=batch_size, dtype=jnp.float32)
 
-    mu = DiscreteMeasure(X, wX)
-    nu = DiscreteMeasure(Y, wY)
+    mu = PointCloudMeasure(X, wX)
+    nu = PointCloudMeasure(Y, wY)
 
     out = solver.solve(
         marginals=(mu, nu),
@@ -78,13 +77,13 @@ def _ot_eps_cost(solver: "SinkhornTwoMarginalLogJaxSolver",
 # ---------- main API ----------
 
 def sinkhorn_divergence_with_solver(
-    source,            # GridMeasure or DiscreteMeasure
-    target,            # GridMeasure or DiscreteMeasure
+    source,            # GridMeasure or PointCloudMeasure
+    target,            # GridMeasure or PointCloudMeasure
     *,
     reg: float = 1e-3, # ε on the (internally normalized) cost; good starting range: 1e-3..1e-2
     maxiter: int = 1000,
     tol: float = 1e-6,
-    batch_size: Optional[int] = None,
+    batch_size: int | None = None,
 ) -> dict:
     """
     Computes S_ε = OT_ε(μ,ν) - 1/2 OT_ε(μ,μ) - 1/2 OT_ε(ν,ν) with your JAX Sinkhorn solver.
@@ -113,5 +112,5 @@ def sinkhorn_divergence_with_solver(
         "maxiter": maxiter,
         "tol": tol,
         # optional W2-like scale (not a true metric, but common to report)
-        "sinkhorn_divergence_w2_like": float(np.sqrt(max(S_eps, 0.0))),
+        "sinkhorn_divergence_w2_like": math.sqrt(max(S_eps, 0.0)),
     }

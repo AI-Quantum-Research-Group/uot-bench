@@ -3,7 +3,6 @@ import random
 import numpy as np
 from scipy.optimize import linprog
 from scipy.linalg import lstsq
-from matplotlib import pyplot as plt
 
 
 ##############################################################################################
@@ -212,6 +211,8 @@ def col_gen(a, b, C, N=6, maxiter=100, maxsamples=1000, beta=5):
 
 
 if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+
     N = 6  # Number of marginals
     grid_size = 50  # Number of sites
     beta = 5  # Hyperparameter for controlling the maximum columns

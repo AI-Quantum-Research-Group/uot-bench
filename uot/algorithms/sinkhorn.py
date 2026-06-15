@@ -1,10 +1,3 @@
-import ot
-import jax
-import numpy as np
-import jax.numpy as jnp
-from ott.solvers import linear
-from ott.geometry import geometry
-
 import jax
 import jax.numpy as jnp
 from jax.scipy.special import logsumexp
@@ -98,4 +91,3 @@ def jax_sinkhorn(a, b, C, epsilon=1e-3, tolerance = 1e-4):
     converged = error < tolerance
 
     return P, jnp.sum(P * C), converged
-

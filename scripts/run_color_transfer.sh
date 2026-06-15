@@ -33,6 +33,3 @@ export XLA_PYTHON_CLIENT_ALLOCATOR="platform"
 echo "Running benchmark from $RUN_CFG"
 python -m uot.experiments.real_data.color_transfer.color_transfer --config "$RUN_CFG"
 
-if type conda >/dev/null 2>&1; then
-  conda deactivate
-fi

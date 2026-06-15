@@ -1,4 +1,5 @@
 from .gaussian_mixture_generator import GaussianMixtureGenerator
+from .gaussian_mixture_barycenter_generator import GaussianMixtureBarycenterGenerator
 from .cauchy_generator import CauchyGenerator
 from .exponential_generator import ExponentialGenerator
 from .paired_generator import PairedGenerator
@@ -6,3 +7,8 @@ from .independent_cauchy import IndependentCauchyGenerator
 from .independent_exponential import IndependentExponentialGenerator
 from .generalized_hyperbolic_mixture import GeneralizedHyperbolicMixtureGenerator
 from .students_t import StudentTGenerator
+from .toy_barycenter_generator import (
+    ToyBarycenterGenerator,
+    FixedListSelector,
+    RoundRobinSelector,
+)

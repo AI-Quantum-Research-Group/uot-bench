@@ -11,7 +11,6 @@ import jax
 from jax import jit
 from jax import numpy as jnp
 from jax.experimental.sparse import BCOO, BCSR
-from matplotlib import pyplot as plt
 
 
 class TerminationStatus(IntEnum):
@@ -745,6 +744,8 @@ def blank_conv_info():
     return conv_info._asdict()
 
 def plot_convergence(array_iters=[], labels=[], filename=None, plot_every=1):
+    from matplotlib import pyplot as plt
+
     fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = plt.subplots(4, 2, figsize=(20, 14))
 
     has_ref_sol = (array_iters[0]["l2_difference"] != jnp.inf).any()

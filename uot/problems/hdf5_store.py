@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import h5py
 import numpy as np
 from jax import numpy as jnp
 
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import GridMeasure, PointCloudMeasure
 from uot.problems.base_problem import MarginalProblem
 from uot.problems.two_marginal import TwoMarginalProblem
 from uot.utils.import_helpers import import_object
+from uot.utils.types import ArrayLike
+
+
+def _as_group(item: h5py.Group | h5py.Dataset | h5py.Datatype) -> h5py.Group:
+    """Cast an h5py item to Group (caller guarantees it is a Group)."""
+    return cast(h5py.Group, item)
 
 
 class HDF5ProblemStore:
@@ -47,20 +54,23 @@ class HDF5ProblemStore:
     def _key(self, problem: MarginalProblem) -> str:
         return problem.key()
 
+    def _root(self) -> h5py.Group:
+        return _as_group(self._file[self.ROOT])
+
     # ------------------------------------------------------------------
     def exists(self, problem: MarginalProblem) -> bool:
         key = self._key(problem)
-        return key in self._file[self.ROOT]
+        return key in self._root()
 
     def all_problems(self) -> list[str]:
-        return sorted(list(self._file[self.ROOT].keys()))
+        return sorted(list(self._root().keys()))
 
     # ------------------------------------------------------------------
     def save(self, problem: MarginalProblem) -> None:
         """Serialize ``problem`` into the HDF5 file."""
 
         key = self._key(problem)
-        base = self._file[self.ROOT].require_group(key)
+        base = self._root().require_group(key)
 
         meta = self._meta_for(problem)
         base.attrs.clear()
@@ -77,23 +87,41 @@ class HDF5ProblemStore:
             del marg_group[child]
 
         for i, m in enumerate(problem.measures):
-            pts, wts = m.to_discrete()
-            chunks = (min(pts.shape[0], 1024), pts.shape[1])
             grp = marg_group.create_group(str(i))
-            grp.create_dataset(
-                "points",
-                data=np.asarray(pts),
-                compression="gzip",
-                compression_opts=4,
-                chunks=chunks,
-            )
-            grp.create_dataset(
-                "weights",
-                data=np.asarray(wts),
-                compression="gzip",
-                compression_opts=4,
-                chunks=(min(wts.shape[0], 1024),),
-            )
+            grp.attrs["measure_kind"] = getattr(m, "kind", "point_cloud")
+            if isinstance(m, GridMeasure):
+                axes_group = grp.create_group("axes")
+                for axis_idx, axis in enumerate(m.axes):
+                    axes_group.create_dataset(
+                        str(axis_idx),
+                        data=np.asarray(axis),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
+                grp.create_dataset(
+                    "weights_nd",
+                    data=np.asarray(m.weights_nd),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=m.weights_nd.shape,
+                )
+            else:
+                pts, wts = m.as_point_cloud()
+                chunks = (min(pts.shape[0], 1024), pts.shape[1])
+                grp.create_dataset(
+                    "points",
+                    data=np.asarray(pts),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=chunks,
+                )
+                grp.create_dataset(
+                    "weights",
+                    data=np.asarray(wts),
+                    compression="gzip",
+                    compression_opts=4,
+                    chunks=(min(wts.shape[0], 1024),),
+                )
 
         # ------------------ cost ----------------------
         cost_group = base.require_group("cost")
@@ -124,12 +152,13 @@ class HDF5ProblemStore:
                 )
 
         # ------------------ optional ground truth -----
+        cost_val = None
+        coup = None
         try:
-            cost_val = problem.get_exact_cost()
-            coup = problem.get_exact_coupling()
+            cost_val = problem.get_exact_cost()  # type: ignore[attr-defined]
+            coup = problem.get_exact_coupling()  # type: ignore[attr-defined]
         except Exception:
-            cost_val = None
-            coup = None
+            pass
 
         if coup is not None:
             ex = base.require_group("exact")
@@ -145,37 +174,48 @@ class HDF5ProblemStore:
     def load(self, key: str) -> MarginalProblem:
         """Load a problem instance by ``key``."""
 
-        base = self._file[self.ROOT][key]
+        base = _as_group(self._root()[key])
         meta = {k: base.attrs[k] for k in base.attrs}
 
         # TODO: refactor this into factory as soon as we introduce
         #       multi-marginal or barycenter
 
-        # reconstruct marginals as DiscreteMeasure
+        # reconstruct marginals as PointCloudMeasure or GridMeasure
         marginals = []
-        mg = base["marginals"]
+        mg = _as_group(base["marginals"])
         for i in sorted(mg.keys(), key=int):
-            grp = mg[i]
-            pts = jnp.array(grp["points"][...])
-            wts = jnp.array(grp["weights"][...])
-            marginals.append(DiscreteMeasure(pts, wts, name=f"m{i}"))
+            grp = _as_group(mg[i])
+            measure_kind = grp.attrs.get("measure_kind", "point_cloud")
+            if measure_kind == "grid":
+                axes_group = _as_group(grp["axes"])
+                axes: list[ArrayLike] = [
+                    jnp.array(_as_group(axes_group[name])[...])  # type: ignore[index]
+                    for name in sorted(axes_group.keys(), key=int)
+                ]
+                weights_nd = jnp.array(_as_group(grp["weights_nd"])[...])  # type: ignore[index]
+                marginals.append(GridMeasure(axes=axes, weights_nd=weights_nd, name=f"m{i}", normalize=False))
+            else:
+                pts = jnp.array(_as_group(grp["points"])[...])  # type: ignore[index]
+                wts = jnp.array(_as_group(grp["weights"])[...])  # type: ignore[index]
+                marginals.append(PointCloudMeasure(pts, wts, name=f"m{i}"))
 
         # cost arrays
-        cost_group = base["cost"]
+        cost_group = _as_group(base["cost"])
         cost_arrays = []
         if "matrix" in cost_group:
-            cost_arrays.append(jnp.array(cost_group["matrix"][...]))
+            cost_arrays.append(jnp.array(_as_group(cost_group["matrix"])[...]))  # type: ignore[index]
         elif "tensor" in cost_group:
-            cost_arrays.append(jnp.array(cost_group["tensor"][...]))
+            cost_arrays.append(jnp.array(_as_group(cost_group["tensor"])[...]))  # type: ignore[index]
         elif "pairwise" in cost_group:
-            for nm in sorted(cost_group["pairwise"].keys(), key=int):
-                cost_arrays.append(jnp.array(cost_group["pairwise"][nm][...]))
+            pairwise_group = _as_group(cost_group["pairwise"])
+            for nm in sorted(pairwise_group.keys(), key=int):
+                cost_arrays.append(jnp.array(_as_group(pairwise_group[nm])[...]))  # type: ignore[index]
 
         cls_path = meta.get("problem_class")
         prob_cls = import_object(cls_path) if cls_path else TwoMarginalProblem
         cost_fn_path = meta.get("cost_fn")
         cost_fn = import_object(cost_fn_path) if cost_fn_path else None
-        name = meta.get("dataset") or meta.get("name", key)
+        name = str(meta.get("dataset") or meta.get("name", key))
 
         if prob_cls is TwoMarginalProblem:
             if len(marginals) != 2 or cost_fn is None:
@@ -190,8 +230,8 @@ class HDF5ProblemStore:
             raise NotImplementedError(msg)
 
         if "exact" in base:
-            ex = base["exact"]
-            prob._exact_coupling = jnp.array(ex["coupling"][...])
+            ex = _as_group(base["exact"])
+            prob._exact_coupling = jnp.array(_as_group(ex["coupling"])[...])  # type: ignore[index]
             prob._exact_cost = float(ex.attrs.get("cost", jnp.inf))
 
         return prob
@@ -209,7 +249,7 @@ class HDF5ProblemStore:
 
     def __len__(self) -> int:
         """Return the number of stored problems."""
-        return len(self._file[self.ROOT].keys())
+        return len(self._root().keys())
 
     def __getstate__(self):
         """

@@ -186,9 +186,9 @@ def plot_store(store_path: str, outdir: str):
 
     for idx, problem in enumerate(iterator):
         logger.debug(f"Processing problem {problem}")
-        mu, nu = problem.get_marginals()
-        mu_pts, mu_w = mu.to_discrete()
-        nu_pts, nu_w = nu.to_discrete()
+        mu, nu = problem.solver_inputs(include_cost=False).marginals
+        mu_pts, mu_w = mu.as_point_cloud()
+        nu_pts, nu_w = nu.as_point_cloud()
 
         prefix = os.path.join(outdir, f"problem_{idx:04d}")
         logger.debug(f"Output files would have prefix {prefix}")
@@ -206,21 +206,21 @@ def plot_dataset(dataset_path: str, outdir: str):
         store_output = outpath / store.name
         os.makedirs(store_output, exist_ok=True)
         logger.debug(f"Created store output directory in {store_output}")
-        plot_store(store, store_output)
+        plot_store(str(store), str(store_output))
 
 
 def plot_hdf5_dataset(path: str, outdir: str):
     out_path = Path(outdir)
     store = HDF5ProblemStore(path)
-    iterator = ProblemIterator(store)
+    iterator = ProblemIterator(store)  # type: ignore[arg-type]
     for problem in iterator:
         logger.debug(f"Processing problem {problem}")
         prefix = str(out_path / f"problem-{problem.key()}")
         logger.debug(f"The key for {problem} is {problem.key()}")
-        mu, nu = problem.get_marginals()
+        mu, nu = problem.solver_inputs(include_cost=False).marginals
         logger.debug(f"Marginals: [{mu}], [{nu}]")
-        mu_pts, mu_w = mu.to_discrete()
-        nu_pts, nu_w = nu.to_discrete()
+        mu_pts, mu_w = mu.as_point_cloud()
+        nu_pts, nu_w = nu.as_point_cloud()
         if jnp.any(jnp.isnan(mu_w)):
             logger.warning(f"Loaded nan mu weights for {problem}")
         if jnp.any(jnp.isnan(nu_w)):
@@ -229,7 +229,7 @@ def plot_hdf5_dataset(path: str, outdir: str):
         plot_and_save(mu_pts, mu_w, nu_pts, nu_w, prefix)
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Inspect & save dataset visualizations.")
     input_group = parser.add_mutually_exclusive_group(required=True)
@@ -251,16 +251,17 @@ if __name__ == "__main__":
     os.makedirs(args.outdir, exist_ok=True)
 
     if args.store is not None:
-        logger.debug(f"Flag set to visualize store. Will read {args.store} and\
-        output to {args.outdir}")
+        logger.debug(f"Flag set to visualize store. Will read {args.store} and output to {args.outdir}")
         plot_store(args.store, args.outdir)
     elif args.dataset is not None:
-        logger.debug(f"Flag set to visualize dataset. Will read {args.dataset}\
-        and output to {args.outdir}")
+        logger.debug(f"Flag set to visualize dataset. Will read {args.dataset} and output to {args.outdir}")
         if args.dataset.endswith('.h5'):
             plot_hdf5_dataset(args.dataset, args.outdir)
         else:
             plot_dataset(args.dataset, args.outdir)
     else:
-        raise ValueError("No input data option (either store or \
-        dataset) was specified.")
+        raise ValueError("No input data option (either store or dataset) was specified.")
+
+
+if __name__ == "__main__":
+    main()

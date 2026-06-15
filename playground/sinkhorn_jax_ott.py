@@ -12,7 +12,7 @@ from uot.utils.costs import cost_euclid_squared
 from uot.experiments.experiment import Experiment
 from uot.experiments.measurement import measure_with_gpu_tracker
 from uot.solvers.base_solver import BaseSolver
-from uot.data.measure import DiscreteMeasure
+from uot.data.measure import PointCloudMeasure
 from uot.problems.iterator import OnlineProblemIterator
 
 import logging
@@ -41,15 +41,15 @@ class OTTSinkhornSolver(BaseSolver):
 
     def solve(
         self,
-        marginals: Sequence[DiscreteMeasure],
+        marginals: Sequence[PointCloudMeasure],
         costs: Sequence[jnp.ndarray],
         reg: float = None,
         maxiter: int = None,
         tol: float = None,
     ):
         # unpack marginals
-        mu = jnp.array(marginals[0].to_discrete()[1])  # shape (n,)
-        nu = jnp.array(marginals[1].to_discrete()[1])  # shape (m,)
+        mu = jnp.array(marginals[0].as_point_cloud()[1])  # shape (n,)
+        nu = jnp.array(marginals[1].as_point_cloud()[1])  # shape (m,)
         C = jnp.array(costs[0])                       # shape (n, m)
         C = C / C.sum()
 
