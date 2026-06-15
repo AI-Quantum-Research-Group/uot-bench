@@ -82,7 +82,7 @@ def sinkhorn_jax(
 
     ln_u0 = jnp.zeros_like(ln_mu)
     ln_v0 = jnp.zeros_like(ln_nu)
-    init_error = jnp.inf
+    init_error = jnp.asarray(jnp.inf, dtype=ln_mu.dtype)
 
     def cond_fn(carry):
         ln_u, ln_v, i, err = carry

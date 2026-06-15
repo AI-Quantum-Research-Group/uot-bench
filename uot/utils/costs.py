@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, Optional
+
 import numpy as np
 import jax.numpy as jnp
 
@@ -79,3 +84,44 @@ def cost_cosine(
 
     cos_sim = dots * inv_norms                        # (n, m)
     return 1.0 - cos_sim                              # (n, m)
+
+
+@dataclass(frozen=True)
+class _CostEntry:
+    uot_fn: Callable
+    ott_factory: Optional[Callable]  # None when ott-jax is not installed
+
+
+def _build_ott_factories() -> dict[str, Callable]:
+    try:
+        from ott.geometry.costs import SqEuclidean, Euclidean, PNormP, Cosine
+        return {
+            "cost_euclid_squared": lambda: SqEuclidean(),
+            "cost_euclid": lambda: Euclidean(),
+            "cost_manhattan": lambda: PNormP(p=1),
+            "cost_cosine": lambda: Cosine(),
+        }
+    except ImportError:
+        return {}
+
+
+_OTT_FACTORIES = _build_ott_factories()
+
+COST_REGISTRY: dict[str, _CostEntry] = {
+    "cost_euclid_squared": _CostEntry(
+        uot_fn=cost_euclid_squared,
+        ott_factory=_OTT_FACTORIES.get("cost_euclid_squared"),
+    ),
+    "cost_euclid": _CostEntry(
+        uot_fn=cost_euclid,
+        ott_factory=_OTT_FACTORIES.get("cost_euclid"),
+    ),
+    "cost_manhattan": _CostEntry(
+        uot_fn=cost_manhattan,
+        ott_factory=_OTT_FACTORIES.get("cost_manhattan"),
+    ),
+    "cost_cosine": _CostEntry(
+        uot_fn=cost_cosine,
+        ott_factory=_OTT_FACTORIES.get("cost_cosine"),
+    ),
+}

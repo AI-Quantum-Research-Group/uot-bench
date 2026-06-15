@@ -252,6 +252,42 @@ class PointCloudMeasure(BaseMeasure):
     def weights(self) -> ArrayLike:
         return self._weights
 
+    def to_ott_geometry(
+        self,
+        other: "PointCloudMeasure | None" = None,
+        *,
+        cost_name: str | None = "cost_euclid_squared",
+        scale_cost: float | str = 1.0,
+        batch_size: int | None = None,
+        epsilon: float = 1e-2,
+    ):
+        """Return an OTT-JAX PointCloud geometry for this measure.
+
+        If *other* is provided, builds a cross-space geometry (self → other).
+        Otherwise builds the self-cost geometry (used in GW intra-space costs).
+
+        Requires ``pip install uot-bench[ott]``.
+        """
+        from uot.interop.ott._problems import (
+            measure_to_pointcloud,
+            two_measures_to_pointcloud,
+        )
+        if other is None:
+            return measure_to_pointcloud(
+                self,
+                cost_name=cost_name,
+                scale_cost=scale_cost,
+                batch_size=batch_size,
+                epsilon=epsilon,
+            )
+        return two_measures_to_pointcloud(
+            self, other,
+            cost_name=cost_name,
+            scale_cost=scale_cost,
+            batch_size=batch_size,
+            epsilon=epsilon,
+        )
+
 
 class DiscreteMeasure(PointCloudMeasure):
     """Compatibility alias for old serialized artifacts and imports."""
@@ -387,6 +423,21 @@ class GridMeasure(BaseMeasure):
     @property
     def weights_nd(self) -> ArrayLike:
         return self._weights_nd
+
+    def to_ott_geometry(
+        self,
+        other: "GridMeasure | None" = None,
+        *,
+        epsilon: float = 1e-2,
+    ):
+        """Return an OTT-JAX Grid geometry for this measure.
+
+        If *other* is provided, validates grid compatibility first.
+        Requires ``pip install uot-bench[ott]``.
+        """
+        from uot.interop.ott._problems import measures_to_grid
+        target = other if other is not None else self
+        return measures_to_grid(self, target, epsilon=epsilon)
 
     def check_compatible(self, other: "GridMeasure", *, atol=1e-8, rtol=1e-7):
         if len(self._axes) != len(other._axes):

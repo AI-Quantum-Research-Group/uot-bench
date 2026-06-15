@@ -34,8 +34,8 @@ class GridOnlySqEuclideanSolver(BaseSolver):
         return {"cost": float(mu.sum() + nu.sum() + len(axes))}
 
 
-def _solve_fn(problem, solver, marginals, costs, **kwargs):
-    return solver.solve(marginals=marginals, costs=costs, **kwargs)
+def _solve_fn(problem, solver, view, **kwargs):
+    return solver.solve(marginals=view.marginals, costs=view.costs, **kwargs)
 
 
 def test_run_on_problems_respects_use_cost_matrix():

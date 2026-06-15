@@ -11,6 +11,7 @@ pip install uot-bench
 ## Optional extras
 
 ```bash
+pip install "uot-bench[ott]"            # OTT-JAX backend (ott-jax>=0.4.7)
 pip install "uot-bench[viz]"            # plotting helpers (matplotlib, plotly, seaborn)
 pip install "uot-bench[image-analysis]" # Pillow, scikit-image
 pip install "uot-bench[color-transfer]" # color transfer experiment
@@ -20,7 +21,7 @@ pip install "uot-bench[mnist]"          # MNIST classification (scikit-learn)
 pip install "uot-bench[gurobi]"         # Gurobi LP solver
 pip install "uot-bench[dev]"            # development tools (pytest, ruff, pyright)
 pip install "uot-bench[docs]"           # docs build (mkdocs-material, mkdocstrings)
-pip install "uot-bench[all]"            # all optional extras
+pip install "uot-bench[all]"            # all optional extras (includes ott)
 ```
 
 ## CUDA (JAX GPU support)

@@ -93,6 +93,9 @@ viz = [
     "dataframe-image",
     "ipython",
 ]
+ott = [
+    "ott-jax>=0.4.7",
+]
 gurobi = [
     "gurobipy",
 ]
@@ -119,6 +122,7 @@ docs = [
 all = [
     "h5py",
     "gpu-tracker",
+    "ott-jax>=0.4.7",
     "scikit-learn",
     "Pillow",
     "scikit-image",

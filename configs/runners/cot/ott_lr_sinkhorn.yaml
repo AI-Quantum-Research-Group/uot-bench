@@ -1,0 +1,21 @@
+param-grids:
+  lr-sinkhorn:
+    - epsilon: !!float 1e-1
+      rank: 10
+    - epsilon: !!float 1e-1
+      rank: 20
+    - epsilon: !!float 1e-2
+      rank: 10
+    - epsilon: !!float 1e-2
+      rank: 20
+
+solvers:
+  ott-lr-sinkhorn:
+    solver: uot.interop.ott.OTTLRSinkhornSolver
+    jit: false
+    use-cost-matrix: false
+    param-grid: lr-sinkhorn
+
+experiment:
+  name: OTT Low-Rank Sinkhorn Solver OT Test
+  function: uot.experiments.measurement.measure_with_gpu_tracker

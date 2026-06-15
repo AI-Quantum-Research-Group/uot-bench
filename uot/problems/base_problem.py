@@ -128,6 +128,7 @@ class Problem(ABC):
         self._shared_support_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
         self._prepared_support_cache: dict[tuple[str, bool, float, float], PreparedAlignmentSupport] = {}
         self._aligned_weights_cache: dict[tuple[str, bool, float, float], ArrayLike] = {}
+        self._view_cache: dict = {}
         self.__hash = None
 
     def __repr__(self):
@@ -172,6 +173,15 @@ class Problem(ABC):
     def get_lambdas(self) -> ArrayLike | None:
         """Return barycenter weights, or ``None`` for two-marginal problems."""
         return None
+
+    def post_solve_hooks(self) -> list:
+        """Return problem-level post-solve hooks.
+
+        Override to attach domain-specific hooks (e.g. image reconstruction)
+        that should run after every solve call on this problem.  Each entry
+        must match the :class:`~uot.experiments.hooks.PostSolveHook` protocol.
+        """
+        return []
 
     def solver_inputs(self, include_cost: bool = True) -> SolverInputs:
         return SolverInputs(

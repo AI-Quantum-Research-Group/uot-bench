@@ -36,11 +36,11 @@ def run_pipeline(
     pbar = tqdm(total=total_runs,
                 desc="Running experiments") if progress else None
 
-    all_iterators = chain(*all_iterators)
+    # Keep the list for resetting; deepcopy the list (not the chain) each time
+    # because itertools.chain objects are not picklable.
+    all_iterators_list = all_iterators
 
-    # copy is needed, because same problems instances
-    # are needed to run with different solver configuration
-    current_iterators = deepcopy(all_iterators)
+    current_iterators = chain(*deepcopy(all_iterators_list))
 
     def progress_callback(n: int = 1) -> None:
         if pbar:
@@ -52,7 +52,7 @@ def run_pipeline(
         for param_kwargs in params:
             if cfg.is_jit:
                 logger.debug(f"Warming up JIT compilation for {cfg.name}")
-                first_problem = next(deepcopy(current_iterators))
+                first_problem = next(chain(*deepcopy(all_iterators_list)))
                 experiment.run_on_problems(
                     problems=[first_problem],
                     solver=cfg.solver,
@@ -82,7 +82,7 @@ def run_pipeline(
 
             df_res["name"] = cfg.name
 
-            current_iterators = deepcopy(all_iterators)
+            current_iterators = chain(*deepcopy(all_iterators_list))
 
             results_list.append(df_res)
 

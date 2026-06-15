@@ -34,6 +34,10 @@ class SolverOutput(TypedDict):
     barycenter: NotRequired[jax.Array]
     us_final: NotRequired[jax.Array]
     vs_final: NotRequired[jax.Array]
+    # Low-rank transport plan factors (Q, R, g) — used by low-rank solvers
+    # to avoid materialising the full (n×m) coupling matrix.
+    # The dense plan is Q @ diag(1/g) @ R.T.
+    low_rank_plan: NotRequired[tuple[jax.Array, jax.Array, jax.Array]]
     # Extra solver-specific fields — solvers may add more keys
     time: NotRequired[float]
 
@@ -51,9 +55,17 @@ class BaseSolver(ABC):
             def solve(self, marginals, costs, reg=0.1, **kwargs):
                 ...
                 return {"cost": jnp.array(transport_cost)}
+
+    **Representation negotiation**: set the class attribute ``input_kind`` to a
+    string registered in :mod:`uot.experiments.representations` to request a
+    pre-built representation object.  The runner will pass this object as the
+    first positional argument to ``solve`` — see :mod:`uot.experiments.representations`
+    for details.  The default ``"marginals_costs"`` preserves the existing
+    ``solve(marginals, costs, **kwargs)`` calling convention.
     """
 
     requires_squared_euclidean: bool = False
+    input_kind: str = "marginals_costs"
 
     @abstractmethod
     def solve(

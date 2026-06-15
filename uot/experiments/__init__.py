@@ -5,7 +5,10 @@ from .measurement import (
     measure_time_and_output,
     measure_solution_precision,
     measure_with_gpu_tracker,
+    invoke_solver,
 )
+from .representations import build_representation, register_representation
+from .hooks import PostSolveHook, apply_hooks
 
 __all__ = [
     "Experiment",
@@ -14,4 +17,9 @@ __all__ = [
     "measure_time_and_output",
     "measure_solution_precision",
     "measure_with_gpu_tracker",
+    "invoke_solver",
+    "build_representation",
+    "register_representation",
+    "PostSolveHook",
+    "apply_hooks",
 ]

@@ -17,8 +17,9 @@ from uot.experiments.real_data.color_transfer.utils import (
     load_config_info,
     sample_image_pairs,
 )
-from uot.experiments.real_data.color_transfer.experiment import ColorTransferExperiment
-from uot.experiments.real_data.color_transfer.runner import run_color_transfer_pipeline
+from uot.experiments import Experiment, run_pipeline
+from uot.experiments.measurement import measure_time_and_output
+from uot.experiments.real_data.color_transfer.hooks import ColorTransferHook
 
 
 if os.environ.get('DEBUG', False):
@@ -64,13 +65,18 @@ def main() -> None:
     base_dir = os.path.join(output_dir, f"color_transfer_{timestamp}")
     os.makedirs(base_dir, exist_ok=True)
 
-    experiment = ColorTransferExperiment(
-        name=config['experiment']['name'],
+    hook = ColorTransferHook(
         output_dir=base_dir,
+        soft_extension_modes=soft_extension_options,
+        displacement_alphas=displacement_alphas,
         drop_columns=drop_columns,
     )
-    experiment.set_soft_extension_modes(soft_extension_options)
-    experiment.set_displacement_alphas(displacement_alphas)
+    experiment = Experiment(
+        name=config['experiment']['name'],
+        solve_fn=measure_time_and_output,  # type: ignore[arg-type]
+        hooks=[hook],
+    )
+
     all_results = []
     for bin_num in bin_numbers:
         logger.info(f'Sampling and loading image pairs for bin-number={bin_num}...')
@@ -83,14 +89,14 @@ def main() -> None:
             active_channels=active_channels,
         )
 
-        bin_results = run_color_transfer_pipeline(
+        bin_results = run_pipeline(
             experiment=experiment,
             solvers=solver_configs,
-            problems=get_image_problems(
+            iterators=[get_image_problems(
                 data,
                 image_pairs,
                 bins_per_channel=bin_num,
-            ),
+            )],
             progress=True,
         )
         all_results.append(bin_results)

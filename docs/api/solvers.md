@@ -34,3 +34,9 @@ See [Writing a custom Solver](../guide/custom-solver.md) for a guide on subclass
         - GradientAscentTwoMarginalSolver
         - LinearProgrammingTwoMarginalSolver
         - BackNForthSqEuclideanSolver
+
+## OTT-JAX solvers
+
+See [uot.interop.ott](interop_ott.md) for the OTT-JAX solver wrappers
+(`OTTSinkhornSolver`, `OTTLRSinkhornSolver`, `OTTGromovWassersteinSolver`, etc.).
+Requires `pip install "uot-bench[ott]"`.
