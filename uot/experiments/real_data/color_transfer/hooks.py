@@ -25,13 +25,14 @@ import datetime
 import gc
 import hashlib
 import os
-from typing import Any
+from typing import Any, cast
 
 import jax
 import numpy as np
 from PIL import Image
 from jax import numpy as jnp
 
+from uot.data.measure import GridMeasure
 from uot.experiments.real_data.color_transfer.measurement import (
     _build_postprocess_modes,
     _compute_distribution_metrics,
@@ -101,7 +102,10 @@ class ColorTransferHook:
         metrics: dict[str, Any],
         context: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        marginals = view.marginals if hasattr(view, "marginals") else problem.get_marginals()
+        marginals = cast(
+            tuple[GridMeasure, GridMeasure],
+            tuple(view.marginals if hasattr(view, "marginals") else problem.get_marginals()),
+        )
 
         axes_mu, mu_nd = marginals[0].as_grid(backend="jax", dtype=jnp.float64)
         axes_nu, nu_nd = marginals[1].as_grid(backend="jax", dtype=jnp.float64)

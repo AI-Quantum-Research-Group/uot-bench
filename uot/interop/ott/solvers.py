@@ -207,7 +207,7 @@ class OTTGromovWassersteinSolver(BaseSolver):
     ):
         _require_ott()
         self._epsilon = epsilon
-        self._relative_epsilon = relative_epsilon
+        self._relative_epsilon: Literal["mean", "std"] | None = relative_epsilon
         self._warm_start = warm_start
         self.tau_a = tau_a
         self.tau_b = tau_b
@@ -389,8 +389,14 @@ class OTTDiscreteBarycenterSolver(BaseSolver):
         **kw: Any,
     ) -> SolverOutput:
         from ott.solvers.linear.continuous_barycenter import FreeWassersteinBarycenter
+        from ott.solvers.linear.sinkhorn import Sinkhorn
 
-        solver = FreeWassersteinBarycenter(threshold=self._threshold)
+        linear_solver = Sinkhorn(
+            lse_mode=self._lse_mode,
+            threshold=self._threshold,
+            max_iterations=self._max_iterations,
+        )
+        solver = FreeWassersteinBarycenter(linear_solver=linear_solver, threshold=self._threshold)
         out = solver(barycenter_problem)
         return _outputs.from_discrete_barycenter_output(out)  # type: ignore[arg-type]
 
@@ -421,11 +427,18 @@ class OTTGWBarycenterSolver(BaseSolver):
         epsilon: float | None = None,
         **kw: Any,
     ) -> SolverOutput:
+        from ott.solvers.linear.sinkhorn import Sinkhorn
+        from ott.solvers.quadratic.gromov_wasserstein import GromovWasserstein
         from ott.solvers.quadratic.gw_barycenter import GromovWassersteinBarycenter
 
         eps = epsilon if epsilon is not None else self._epsilon
-        solver = GromovWassersteinBarycenter(epsilon=eps)
-        out = solver(gw_barycenter_problem)
+        quadratic_solver = GromovWasserstein(linear_solver=Sinkhorn(), epsilon=eps)
+        solver = GromovWassersteinBarycenter(
+            quadratic_solver=quadratic_solver,
+            max_iterations=self._max_iterations,
+        )
+        bar_size = int(gw_barycenter_problem.segmented_y_b[0].shape[1])
+        out = solver(gw_barycenter_problem, bar_size=bar_size)
         return _outputs.from_discrete_barycenter_output(out)
 
 
@@ -449,7 +462,9 @@ class OTTUnivariateSolver(BaseSolver):
         costs: Any,
         **kw: Any,
     ) -> SolverOutput:
-        from ott.solvers.linear.univariate import UnivariateSolver
+        from ott.geometry.pointcloud import PointCloud
+        from ott.problems.linear.linear_problem import LinearProblem
+        from ott.solvers.linear.univariate import quantile_solver
 
         import jax.numpy as jnp
         from uot.interop.ott._costs import cost_fn_for_name
@@ -457,16 +472,17 @@ class OTTUnivariateSolver(BaseSolver):
         mu, nu = marginals[0], marginals[1]
         x_pts, x_wts = mu.as_point_cloud()
         y_pts, y_wts = nu.as_point_cloud()
-        x_pts = jnp.asarray(x_pts).ravel()
-        y_pts = jnp.asarray(y_pts).ravel()
+        x_pts = jnp.asarray(x_pts)
+        y_pts = jnp.asarray(y_pts)
         x_wts = jnp.asarray(x_wts)
         y_wts = jnp.asarray(y_wts)
 
         cost_fn = self._cost_fn or cost_fn_for_name(kw.get("cost_name", "cost_euclid"))
-        solver = UnivariateSolver()
-        out = solver(x_pts, y_pts, a=x_wts, b=y_wts, cost_fn=cost_fn)
+        geom = PointCloud(x_pts, y_pts, cost_fn=cost_fn)
+        prob = LinearProblem(geom, a=x_wts, b=y_wts)
+        out = quantile_solver(prob)
         return {
-            "cost": jnp.asarray(float(out.ot_cost)),
+            "cost": jnp.asarray(jnp.sum(out.ot_costs)),
             "converged": True,
             "iterations": 0,
         }

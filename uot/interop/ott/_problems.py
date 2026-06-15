@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 import jax.numpy as jnp
 
@@ -13,6 +13,10 @@ if TYPE_CHECKING:
     from ott.geometry.geometry import Geometry
     from ott.problems.linear.linear_problem import LinearProblem
     from ott.problems.quadratic.quadratic_problem import QuadraticProblem
+
+# OTT-JAX's accepted `scale_cost` literals (uot's public API also accepts
+# arbitrary strings for forward-compatibility, hence the cast at call sites).
+_OttScaleCost = float | Literal["mean", "max_norm", "max_bound", "max_cost", "median"]
 
 
 def measure_to_pointcloud(
@@ -37,7 +41,7 @@ def measure_to_pointcloud(
         pts,
         pts,
         cost_fn=cost_fn,
-        scale_cost=scale_cost,
+        scale_cost=cast(_OttScaleCost, scale_cost),
         batch_size=batch_size,
         epsilon=epsilon,
     )
@@ -63,7 +67,7 @@ def two_measures_to_pointcloud(
         x,
         y,
         cost_fn=cost_fn,
-        scale_cost=scale_cost,
+        scale_cost=cast(_OttScaleCost, scale_cost),
         batch_size=batch_size,
         epsilon=epsilon,
     )
@@ -79,8 +83,8 @@ def measures_to_grid(
     from ott.geometry.grid import Grid
 
     mu.check_compatible(nu)
-    axes, _ = mu.as_grid()
-    return Grid(x=axes, epsilon=epsilon)
+    axes, _ = mu.as_grid(backend="jax")
+    return Grid(x=[jnp.asarray(ax) for ax in axes], epsilon=epsilon)
 
 
 def two_marginal_to_linear_problem(
@@ -104,8 +108,8 @@ def two_marginal_to_linear_problem(
         batch_size=batch_size,
         epsilon=epsilon,
     )
-    a = jnp.asarray(mu.weights if hasattr(mu, "weights") else mu.as_point_cloud()[1])
-    b = jnp.asarray(nu.weights if hasattr(nu, "weights") else nu.as_point_cloud()[1])
+    a = jnp.asarray(mu.as_point_cloud()[1])
+    b = jnp.asarray(nu.as_point_cloud()[1])
     return LinearProblem(geom, a=a, b=b, tau_a=tau_a, tau_b=tau_b)
 
 
@@ -142,8 +146,8 @@ def two_marginal_to_quadratic_problem(
             mu, nu, cost_name=cost_name, scale_cost=scale_cost, epsilon=epsilon,
         )
 
-    a = jnp.asarray(mu.weights if hasattr(mu, "weights") else mu.as_point_cloud()[1])
-    b = jnp.asarray(nu.weights if hasattr(nu, "weights") else nu.as_point_cloud()[1])
+    a = jnp.asarray(mu.as_point_cloud()[1])
+    b = jnp.asarray(nu.as_point_cloud()[1])
 
     return QuadraticProblem(
         geom_xx=geom_xx,
