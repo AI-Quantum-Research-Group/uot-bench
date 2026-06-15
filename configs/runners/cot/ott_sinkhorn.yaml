@@ -1,0 +1,21 @@
+param-grids:
+  sinkhorn:
+    - epsilon: !!float 1.0
+      maxiter: 2000
+    - epsilon: !!float 1e-1
+      maxiter: 2000
+    - epsilon: !!float 1e-2
+      maxiter: 2000
+    - epsilon: !!float 1e-3
+      maxiter: 2000
+
+solvers:
+  ott-sinkhorn:
+    solver: uot.interop.ott.OTTSinkhornSolver
+    jit: false
+    use-cost-matrix: false
+    param-grid: sinkhorn
+
+experiment:
+  name: OTT Sinkhorn Solver OT Test
+  function: uot.experiments.measurement.measure_with_gpu_tracker

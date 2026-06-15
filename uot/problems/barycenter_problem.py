@@ -67,6 +67,38 @@ class BarycenterProblem(Problem):
             "cost": self.cost_name,
         }
 
+    def to_ott_barycenter_problem(
+        self,
+        *,
+        epsilon: float = 1e-2,
+        cost_name: str | None = None,
+        scale_cost: float | str = 1.0,
+        batch_size: int | None = None,
+    ):
+        """Return an OTT-JAX FreeBarycenterProblem from this problem.
+
+        Requires ``pip install uot-bench[ott]``.
+        """
+        from ott.problems.linear.barycenter_problem import FreeBarycenterProblem
+        from uot.interop.ott._costs import cost_fn_for_name
+
+        import jax.numpy as jnp
+        name = cost_name or self.cost_name
+
+        ys = []
+        bs = []
+        for m in self.measures:
+            pts, wts = m.as_point_cloud()
+            ys.append(jnp.asarray(pts))
+            bs.append(jnp.asarray(wts))
+
+        return FreeBarycenterProblem(
+            y=jnp.stack(ys),
+            b=jnp.stack(bs),
+            epsilon=epsilon,
+            cost_fn=cost_fn_for_name(name),
+        )
+
     def free_memory(self) -> None:
         self._C = None
         self._cost_cache = [None] * len(self.cost_fns)

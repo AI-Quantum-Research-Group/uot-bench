@@ -1,0 +1,16 @@
+param-grids:
+  gw:
+    - epsilon: !!float 1e-1
+    - epsilon: !!float 1e-2
+    - epsilon: !!float 1e-3
+
+solvers:
+  ott-gw:
+    solver: uot.interop.ott.OTTGromovWassersteinSolver
+    jit: false
+    use-cost-matrix: false
+    param-grid: gw
+
+experiment:
+  name: OTT Gromov-Wasserstein Solver OT Test
+  function: uot.experiments.measurement.measure_with_gpu_tracker

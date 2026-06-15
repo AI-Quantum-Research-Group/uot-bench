@@ -92,5 +92,61 @@ class TwoMarginalProblem(MarginalProblem):
         self._exact_coupling = T
         self._exact_cost = log['cost']
 
+    def to_ott_linear_problem(
+        self,
+        *,
+        tau_a: float = 1.0,
+        tau_b: float = 1.0,
+        scale_cost: float | str = 1.0,
+        batch_size: int | None = None,
+        epsilon: float = 1e-2,
+    ):
+        """Return an OTT-JAX LinearProblem from this two-marginal problem.
+
+        Requires ``pip install uot-bench[ott]``.
+        """
+        from uot.interop.ott._problems import two_marginal_to_linear_problem
+        return two_marginal_to_linear_problem(
+            self._mu, self._nu,
+            cost_name=self.cost_name,
+            scale_cost=scale_cost,
+            batch_size=batch_size,
+            epsilon=epsilon,
+            tau_a=tau_a,
+            tau_b=tau_b,
+        )
+
+    def to_ott_quadratic_problem(
+        self,
+        *,
+        tau_a: float = 1.0,
+        tau_b: float = 1.0,
+        fused_penalty: float = 0.0,
+        scale_cost: float | str = 1.0,
+        epsilon: float = 1e-2,
+        gw_unbalanced_correction: bool = True,
+        ranks: int | tuple[int, ...] = -1,
+        tolerances: float | tuple[float, ...] = 1e-2,
+    ):
+        """Return an OTT-JAX QuadraticProblem (GW) from this problem.
+
+        Intra-space geometries are built from each measure's self-cost.
+        Set ``fused_penalty > 0`` to include the cross-space (fused GW) term.
+        Requires ``pip install uot-bench[ott]``.
+        """
+        from uot.interop.ott._problems import two_marginal_to_quadratic_problem
+        return two_marginal_to_quadratic_problem(
+            self._mu, self._nu,
+            cost_name=self.cost_name,
+            scale_cost=scale_cost,
+            epsilon=epsilon,
+            tau_a=tau_a,
+            tau_b=tau_b,
+            fused_penalty=fused_penalty,
+            gw_unbalanced_correction=gw_unbalanced_correction,
+            ranks=ranks,
+            tolerances=tolerances,
+        )
+
     def free_memory(self) -> None:
         self._C = None
