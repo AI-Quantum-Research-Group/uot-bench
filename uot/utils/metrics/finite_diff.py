@@ -23,13 +23,13 @@ def compute_jacobian_nd(T: jnp.ndarray, grid_spacings: Sequence[float]) -> jnp.n
         for beta in range(d):
             idx_f = list(idx)
             idx_b = list(idx)
-            idx_f[beta] += 1
-            idx_b[beta] -= 1
-            idx_f[beta] = jnp.clip(idx_f[beta], 0, grid_shape[beta] - 1)
-            idx_b[beta] = jnp.clip(idx_b[beta], 0, grid_shape[beta] - 1)
+            idx_f[beta] = jnp.clip(idx[beta] + 1, 0, grid_shape[beta] - 1)
+            idx_b[beta] = jnp.clip(idx[beta] - 1, 0, grid_shape[beta] - 1)
             T_f = T[tuple(idx_f)]
             T_b = T[tuple(idx_b)]
-            diff = (T_f - T_b) / (2 * grid_spacings[beta])
+            # stencil width is 2h in the interior, h at boundaries (one-sided)
+            denom = (idx_f[beta] - idx_b[beta]) * grid_spacings[beta]
+            diff = (T_f - T_b) / denom
             J = J.at[:, beta].set(diff)
         return J  # full Jacobian, not symmetrized
 
