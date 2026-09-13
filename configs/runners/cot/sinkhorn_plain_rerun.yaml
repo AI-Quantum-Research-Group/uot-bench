@@ -1,0 +1,40 @@
+# Re-run of the vanilla (scaling-form) Sinkhorn solver on the 1D benchmark.
+#
+# The `sinkhorn` rows currently in dashboard/data/cot1d/ were produced by the
+# old `_sinkhorn` log-domain-increment path, which yields NaN whenever a
+# marginal contains exactly-zero weights (log(0) = -inf, then -inf + -inf - -inf
+# = NaN at the second iteration; `NaN > tol` is False, so the while_loop exits
+# at iteration 11 and reports status=success).  `SinkhornTwoMarginalSolver` now
+# calls `_sinkhorn_plain` -- scaling form, guarded division, no logarithms --
+# so those numbers have to be regenerated.
+#
+# The reg / solver grid is otherwise identical to configs/runners/cot/sinkhorn.yaml
+# so the new rows stay directly comparable with the existing `sinkhorn-log` rows.
+#
+# maxiter is 100_000 rather than the 1_000_000 used by sinkhorn.yaml.  At
+# reg = 1e-3 the vanilla solver does not converge to tol = 1e-6 and runs to the
+# cap on most problems; the loop is kernel-launch bound (~3-5 s per 100k
+# iterations, near-independent of n), so a 1_000_000 cap would multiply the
+# whole sweep by ~10 for no extra information -- the reg = 1e-3 row is reported
+# as "did not converge" either way.  The cap is recorded in the `maxiter` column
+# of every output row, so the reduction is visible in the data.
+param-grids:
+  sinkhorn:
+    - reg: !!float 1.0
+      maxiter: 100_000
+    - reg: !!float 1e-1
+      maxiter: 100_000
+    - reg: !!float 1e-2
+      maxiter: 100_000
+    - reg: !!float 1e-3
+      maxiter: 100_000
+
+solvers:
+  sinkhorn:
+    solver: uot.solvers.sinkhorn.SinkhornTwoMarginalSolver
+    jit: true
+    param-grid: sinkhorn
+
+experiment:
+  name: Sinkhorn Solvers OT Test
+  function: uot.experiments.measurement.measure_with_gpu_tracker
