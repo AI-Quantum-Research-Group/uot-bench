@@ -1,0 +1,29 @@
+# SGD rerun for the 1D exponential families, one regularization per config so
+# the sweep can be sharded across GPUs.
+#
+# Reproduces the solver and hyper-parameters of configs/runners/cot/sgd.yaml
+# exactly (lr 0.002, momentum 0.9, maxiter 1e6, tol 1e-6) so the results are
+# comparable with the October 2025 SGD rows for the other 12 distributions.
+# maxiter is deliberately left at 1_000_000: the max-iter hit rate is defined
+# relative to the cap, and lowering it would make these rows incomparable with
+# the rest of the same panel (at 1e5 the exp-vs-cauchy rate goes 48% -> 100%).
+#
+# Needs the include_zeros fix in GradientAscentMultiMarginalSGD; without it
+# every exponential problem dies on a cost/marginal shape mismatch.
+param-grids:
+  gradient:
+    - reg: !!float 0.1
+      maxiter: 1000000
+      tol: 0.000001
+      learning_rate: 0.002
+      momentum: 0.9
+
+solvers:
+  sgd:
+    solver: uot.solvers.gradient_ascent.GradientAscentMultiMarginalSGD
+    jit: true
+    param-grid: gradient
+
+experiment:
+  name: Gradient Ascent Test
+  function: uot.experiments.measurement.measure_with_gpu_tracker

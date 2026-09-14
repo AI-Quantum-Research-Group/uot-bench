@@ -67,20 +67,50 @@ it whole would have double-counted that distribution at reg=1e-3. Only the
 `exp-vs-cauchy` and `exp-vs-gaussian` rows were taken (434 of 651). After the
 filter no (dataset, reg) cell is duplicated anywhere in this directory.
 
-**Coverage gap — the December rerun used `sgd-reg-0.001.yaml`, which has the
-other three regs commented out.** So:
+**Coverage is now complete: all 15 distributions x 4 regs.** The December
+rerun used `sgd-reg-0.001.yaml`, which covers reg = 1e-3 only. The remaining
+three regs were run on 2026-09-14 (12 SLURM shards, all COMPLETED, 2576 runs,
+100% success, 0 shape errors) and imported as:
 
-| distribution | reg=0.001 | reg=0.01 | reg=0.1 | reg=1.0 |
+| file | rows | regs |
+|---|---|---|
+| `sgd_1d_light_tailed_exponential_rerun_14-highreg.csv` | 630 | 0.01, 0.1, 1.0 |
+| `sgd_1d_paired_exp_vs_cauchy_rerun_14-highreg.csv` | 651 | 0.01, 0.1, 1.0 |
+| `sgd_1d_paired_exp_vs_gaussian_rerun_14-highreg.csv` | 651 | 0.01, 0.1, 1.0 |
+
+Same solver and hyper-parameters as every other SGD row (lr 0.002, momentum
+0.9, maxiter 1e6, tol 1e-6), via `configs/runners/cot/sgd_exp_rerun_reg*.yaml`.
+maxiter was deliberately left at 1e6: the max-iter hit rate is defined relative
+to the cap, so lowering it would make these rows incomparable with the rest of
+the same panel (at a 1e5 cap the exp-vs-cauchy rate goes 48% -> 100%).
+
+That run required fixing `GradientAscentMultiMarginalSGD`, which extracted
+marginals with `as_point_cloud(include_zeros=False)` and therefore died on
+every exponential problem; see the commit for details. `SAGASolver` still has
+the same latent bug and was left alone.
+
+**The 2026-09-14 run also re-ran reg = 1e-3 as a control, and reproduced the
+December numbers exactly** -- 19.5 / 48.4 / 97.7 % for exponential /
+exp-vs-cauchy / exp-vs-gaussian, delta 0.0 on all three. So the December files
+are kept for reg = 1e-3 (importing the new ones too would duplicate those
+cells) and the two runs are known-equivalent, not merely assumed so. It also
+means the `include_zeros` fix is a genuine no-op wherever data already existed.
+
+Resulting hit rates (%), max-iter / total:
+
+| distribution | 0.001 | 0.01 | 0.1 | 1.0 |
 |---|---|---|---|---|
-| exponential, exp-vs-cauchy, exp-vs-gaussian | yes | **none** | **none** | **none** |
-| the other 12 distributions | yes | yes | yes | yes |
+| exponential | 19.5 | 58.1 | 84.8 | 100.0 |
+| exp-vs-cauchy | 48.4 | 91.2 | 95.9 | 100.0 |
+| exp-vs-gaussian | 97.7 | 100.0 | 100.0 | 100.0 |
 
-A figure spanning all four regs (e.g. hit rate vs eps) will have no SGD data
-for the three exponential rows outside eps=1e-3. Closing that gap needs a
-rerun, and the solver must be fixed first: `include_zeros=False` is still on
-`uot/solvers/gradient_ascent/gradient_ascent.py:44` (and in `SAGASolver`), so
-the October failure still reproduces exactly on current code. The flag is a
-no-op for the other 12 distributions, which have no exact-zero weights.
+Note these do **not** match the printed thesis figure at reg = 0.01 / 0.1 / 1.0,
+which shows roughly 50 / 78 / 95 % for all three rows. The reg = 1e-3 column
+does match. The printed figure's values are identical across all three
+distributions at those three regs, which measured data does not reproduce --
+the three distributions differ substantially from one another here. The source
+of the printed values is unresolved; no successful SGD exponential run at those
+regs exists anywhere on the cluster, and SLURM accounting shows none ever ran.
 
 Still filter on `status == "success"` before computing any hit rate: the
 retained failed rows have no `iterations`, and a heatmap counting

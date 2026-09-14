@@ -40,8 +40,16 @@ class GradientAscentMultiMarginalSGD(BaseSolver):
         nesterov: bool | None = None,
     ) -> SolverOutput:
         # extract weights a_i
+        #
+        # include_zeros=True: the cost matrix below is the full n x n grid, so
+        # the marginals have to keep their zero-weight support points. Dropping
+        # them (include_zeros=False) shrinks a_i to k < n whenever a generator
+        # emits exact zeros -- as the exponential families do, since scipy's
+        # expon.pdf is exactly 0 to the left of loc -- and the solve then dies
+        # with "Cost shape (n, n) incompatible with marginals (k, n)".
+        # This is a no-op for distributions with no exact-zero weights.
         a_list: list[jax.Array] = [
-            jnp.asarray(m.as_point_cloud(include_zeros=False)[1])
+            jnp.asarray(m.as_point_cloud(include_zeros=True)[1])
             for m in marginals
             ]
         N = len(a_list)
