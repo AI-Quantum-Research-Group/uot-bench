@@ -1,14 +1,16 @@
+from functools import partial
+
 import jax.numpy as jnp
 from jax import lax
 from jax import jit
 from jax.scipy.special import logsumexp
 
 
-@jit(static_argnames=[
+@partial(jit, static_argnames=(
     'reg',
     'maxiter',
     'return_diagnostics',
-])
+))
 def barycenter_sinkhorn(
         measures: jnp.ndarray,
         cost: jnp.ndarray,
